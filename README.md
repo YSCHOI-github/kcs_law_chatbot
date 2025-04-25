@@ -18,7 +18,7 @@
 
 1. 리포지토리 클론 및 이동
    ```bash
-   git clone https://github.com/your-org/law-chatbot.git
+   git clone https://github.com/YSCHOI-github/law-chatbot.git
    cd law-chatbot
    ```
 
