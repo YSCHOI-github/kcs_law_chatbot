@@ -1,0 +1,10 @@
+python-dotenv
+langchain
+streamlit
+google-generativeai
+PyPDF2
+aiohttp
+asyncio
+numpy
+scikit-learn    # TF-IDF 및 코사인 유사도 계산
+pandas          # 데이터 처리 및 관리
