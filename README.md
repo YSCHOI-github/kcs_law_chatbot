@@ -18,8 +18,8 @@
 
 1. 리포지토리 클론 및 이동
    ```bash
-   git clone https://github.com/YSCHOI-github/law-chatbot.git
-   cd law-chatbot
+   git clone https://github.com/YSCHOI-github/kcs_law_chatbot.git
+   cd kcs_law_chatbot
    ```
 
 2. 가상환경 생성 및 활성화
