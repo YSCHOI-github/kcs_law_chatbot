@@ -2,7 +2,7 @@
 .venv/
 
 # 환경변수
-.env/
+.env
 
 # 예전 파일들
 previously/
