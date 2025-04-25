@@ -46,7 +46,8 @@ LAW_CATEGORIES = {
         "관세법 시행령": "laws/관세법 시행령.pdf",
         "관세법 시행규칙": "laws/관세법 시행규칙.pdf",
         "관세평가 운영에 관한 고시": "laws/관세평가 운영에 관한 고시.pdf",
-        "관세조사 운영에 관한 훈령": "laws/관세조사 운영에 관한 훈령.pdf"
+        "관세조사 운영에 관한 훈령": "laws/관세조사 운영에 관한 훈령.pdf",
+        "Customs_Valuation_Archer": "laws/customs_valuation_archer.pdf",
     },
     "자유무역협정": {
         "원산지조사 운영에 관한 훈령": "laws/원산지조사 운영에 관한 훈령.pdf",
@@ -243,6 +244,7 @@ with st.sidebar:
 - 관세법 시행규칙
 - 관세평가 운영에 관한 고시
 - 관세조사 운영에 관한 훈령
+- Customs_Valuation_Archer
 
 **자유무역협정 관련:**
 - 원산지조사 운영에 관한 훈령
