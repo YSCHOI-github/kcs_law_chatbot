@@ -131,7 +131,13 @@ def get_model():
 
 # 법령별 에이전트 응답 (async)
 async def get_law_agent_response_async(law_name, question, history):
-    vec, mat, chunks = st.session_state.embedding_data[law_name]
+    # 임베딩 데이터가 없으면 생성
+    if law_name not in st.session_state.embedding_data:
+        text = st.session_state.law_data.get(law_name, "")
+        vec, mat, chunks = create_embeddings_for_text(text)
+        st.session_state.embedding_data[law_name] = (vec, mat, chunks)
+    else:
+        vec, mat, chunks = st.session_state.embedding_data[law_name]
     context = search_relevant_chunks(question, vec, mat, chunks)
     prompt = f"""
 당신은 {law_name} 전문가입니다.
