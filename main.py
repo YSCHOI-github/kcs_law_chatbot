@@ -33,11 +33,6 @@ if 'last_used_category' not in st.session_state:
 # 임베딩 캐싱용 상태
 if 'embedding_data' not in st.session_state:
     st.session_state.embedding_data = {}
-# 재사용 가능한 asyncio 이벤트 루프
-if 'event_loop' not in st.session_state:
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    st.session_state.event_loop = loop
 
 # 법령 카테고리 및 PDF 파일 경로
 LAW_CATEGORIES = {
@@ -116,6 +111,16 @@ def get_model():
 
 # 법령별 에이전트 응답 (async)
 async def get_law_agent_response_async(law_name, question, history):
+    # 임베딩 데이터가 없으면 생성
+    if law_name not in st.session_state.embedding_data:
+        if law_name in st.session_state.law_data:
+            text = st.session_state.law_data[law_name]
+            vec, mat, chunks = create_embeddings_for_text(text)
+            st.session_state.embedding_data[law_name] = (vec, mat, chunks)
+        else:
+            # 데이터가 없는 경우 에러 메시지 반환
+            return law_name, f"오류: {law_name}에 대한 데이터를 찾을 수 없습니다."
+    
     vec, mat, chunks = st.session_state.embedding_data[law_name]
     context = search_relevant_chunks(question, vec, mat, chunks)
     prompt = f"""
@@ -131,15 +136,25 @@ async def get_law_agent_response_async(law_name, question, history):
 답변할 때 법조항과 출처를 명확히 제시해주세요.
 """
     model = get_model()
-    loop = st.session_state.event_loop
-    with ThreadPoolExecutor() as pool:
-        res = await loop.run_in_executor(pool, lambda: model.generate_content(prompt))
-    return law_name, res.text
+    
+    # ThreadPoolExecutor를 사용하는 대신 직접 호출
+    try:
+        res = model.generate_content(prompt)
+        return law_name, res.text
+    except Exception as e:
+        return law_name, f"오류 발생: {str(e)}"
 
 # 모든 에이전트 병렬 실행
 async def gather_agent_responses(question, history):
-    tasks = [get_law_agent_response_async(name, question, history)
-             for name in st.session_state.law_data]
+    # 비어있는 경우 먼저 데이터 로드
+    if not st.session_state.law_data:
+        category = st.session_state.selected_category
+        st.session_state.law_data = load_law_data(category)
+    
+    tasks = []
+    for name in st.session_state.law_data:
+        tasks.append(get_law_agent_response_async(name, question, history))
+    
     return await asyncio.gather(*tasks)
 
 # 헤드 에이전트 통합 답변
@@ -179,7 +194,10 @@ def get_head_agent_response(responses, question, history):
 
 위 구조에 따라 단계별 추론을 명확히 보여주면서 최종 통합 답변을 작성해주세요.
 """
-    return get_model().generate_content(prompt).text
+    try:
+        return get_model().generate_content(prompt).text
+    except Exception as e:
+        return f"통합 답변 생성 중 오류 발생: {str(e)}"
 
 # --- UI: 카테고리 선택 ---
 with st.expander("카테고리 선택 (선택사항)", expanded=True):
@@ -224,10 +242,19 @@ if user_input := st.chat_input("질문을 입력하세요"):
     st.session_state.chat_history.append({"role": "user", "content": user_input})
     with st.chat_message("assistant"):
         history = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.chat_history])
-        responses = st.session_state.event_loop.run_until_complete(
-            gather_agent_responses(user_input, history)
-        )
-        answer = get_head_agent_response(responses, user_input, history)
+        
+        # 비동기 이벤트 루프 생성
+        with st.spinner("법령을 분석하고 답변 중..."):
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                responses = loop.run_until_complete(gather_agent_responses(user_input, history))
+                answer = get_head_agent_response(responses, user_input, history)
+            except Exception as e:
+                answer = f"오류가 발생했습니다: {str(e)}"
+            finally:
+                loop.close()
+                
         st.markdown(answer)
         st.session_state.chat_history.append({"role": "assistant", "content": answer})
 
