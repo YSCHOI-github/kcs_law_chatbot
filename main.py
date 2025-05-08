@@ -126,7 +126,7 @@ async def get_law_agent_response_async(law_name, question, history):
         vec, mat, chunks = st.session_state.embedding_data[law_name]
     context = search_relevant_chunks(question, vec, mat, chunks)
     prompt = f"""
-당신은 {law_name} 전문가입니다.
+당신은 대한민국 {law_name} 법률 전문가입니다.
 
 아래는 질문과 관련된 법령 내용입니다. 반드시 다음 법령 내용을 기반으로 질문에 답변해주세요:
 {context}
@@ -135,7 +135,20 @@ async def get_law_agent_response_async(law_name, question, history):
 {history}
 
 질문: {question}
-답변할 때 법조항과 출처를 명확히 제시해주세요.
+
+# 응답 지침
+1. 제공된 법령 정보에 기반하여 정확하게 답변해주세요.
+2. 답변에 사용한 모든 법령 출처(법령명, 조항)를 명확히 인용해주세요.
+3. 관련 법조항을 직접 인용하되, 법률 용어는 가능한 쉽게 설명해주세요.
+4. 법령에 명시되지 않은 내용은 추측하지 말고, 알 수 없다고 정직하게 답변해주세요.
+5. 필요한 경우 법령 간의 관계와 위계(법률>시행령>시행규칙>고시)를 설명해주세요.
+
+# 답변 형식:
+- 먼저 질문의 핵심을 간략히 요약
+- 적용되는 주요 법령 조항 인용
+- 법령 해석 및 적용 방안 설명
+- 필요시 예외사항이나 추가 고려사항 언급
+
 """
     model = get_model()
     loop = st.session_state.event_loop
@@ -245,7 +258,7 @@ with st.sidebar:
 
 다음 법령들을 기반으로 답변을 제공합니다:
 
-**관세법 관련:**
+**관세조사 관련:**
 - 관세법
 - 관세법 시행령
 - 관세법 시행규칙
