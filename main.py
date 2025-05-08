@@ -41,7 +41,7 @@ if 'event_loop' not in st.session_state:
 
 # 법령 카테고리 및 PDF 파일 경로
 LAW_CATEGORIES = {
-    "관세법": {
+    "관세조사": {  # Updated category name
         "관세법": "laws/관세법.pdf",
         "관세법 시행령": "laws/관세법 시행령.pdf",
         "관세법 시행규칙": "laws/관세법 시행규칙.pdf",
@@ -205,10 +205,10 @@ def get_head_agent_response(responses, question, history):
 with st.expander("카테고리 선택 (선택사항)", expanded=True):
     c1, c2, c3, c4 = st.columns(4)
     with c1:
-        if st.button("관세법", use_container_width=True):
-            st.session_state.selected_category = "관세법"
-            st.session_state.law_data = load_law_data("관세법")
-            st.session_state.last_used_category = "관세법"
+        if st.button("관세조사", use_container_width=True):  # Updated button label
+            st.session_state.selected_category = "관세조사"  # Updated category name
+            st.session_state.law_data = load_law_data("관세조사")  # Updated category name
+            st.session_state.last_used_category = "관세조사"  # Updated category name
             st.rerun()
     with c2:
         if st.button("자유무역협정", use_container_width=True):
