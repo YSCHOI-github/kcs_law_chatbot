@@ -69,6 +69,16 @@ streamlit run main.py
   - 관세평가 운영에 관한 고시 (`laws/관세평가 운영에 관한 고시.pdf`)
   - 관세조사 운영에 관한 훈령 (`laws/관세조사 운영에 관한 훈령.pdf`)
 
+- **관세평가**:
+  - WTO관세평가협정 ('laws/WTO관세평가협정_영문판.pdf')
+  - TCCV기술문서_영문판 ("laws/TCCV기술문서_영문판.pdf")
+  - 관세와무역에관한일반협정제7조 ("laws/관세와무역에관한일반협정제7조_영문판.pdf")
+  - 권고의견 ("laws/권고의견_영문판.pdf")
+  - 사례연구_영문판 ("laws/사례연구_영문판.pdf")
+  - 연구_영문판 (laws/연구_영문판.pdf")
+  - 해설_영문판 (laws/해설_영문판.pdf")
+  - WCO Customs_Valuation_Archer ("laws/customs_valuation_archer.pdf")
+
 - **자유무역협정**:
   - 원산지조사 운영에 관한 훈령 (`laws/원산지조사 운영에 관한 훈령.pdf`)
   - 자유무역협정 원산지인증수출자 운영에 관한 고시 (`laws/자유무역협정 원산지인증수출자 운영에 관한 고시.pdf`)
