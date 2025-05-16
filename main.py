@@ -47,7 +47,20 @@ LAW_CATEGORIES = {
         "관세법 시행규칙": "laws/관세법 시행규칙.pdf",
         "관세평가 운영에 관한 고시": "laws/관세평가 운영에 관한 고시.pdf",
         "관세조사 운영에 관한 훈령": "laws/관세조사 운영에 관한 훈령.pdf",
-        # "Customs_Valuation_Archer": "laws/customs_valuation_archer.pdf",
+    },
+    "관세평가": {  # Updated category name
+        "WTO관세평가협정": "laws/WTO관세평가협정_영문판.pdf",
+        "TCCV기술문서_영문판": "laws/TCCV기술문서_영문판.pdf",
+        "관세와무역에관한일반협정제7조_영문판": "laws/관세와무역에관한일반협정제7조_영문판.pdf",
+        "권고의견_영문판": "laws/권고의견_영문판.pdf",
+        "사례연구_영문판": "laws/사례연구_영문판.pdf",
+        "연구_영문판": "laws/연구_영문판.pdf",
+        "해설_영문판": "laws/해설_영문판.pdf",
+        "Customs_Valuation_Archer_part1": "laws/customs_valuation_archer_part1.pdf",
+        "Customs_Valuation_Archer_part2": "laws/customs_valuation_archer_part2.pdf",
+        "Customs_Valuation_Archer_part3": "laws/customs_valuation_archer_part3.pdf",
+        "Customs_Valuation_Archer_part4": "laws/customs_valuation_archer_part4.pdf",
+        "Customs_Valuation_Archer_part5": "laws/customs_valuation_archer_part5.pdf",
     },
     "자유무역협정": {
         "원산지조사 운영에 관한 훈령": "laws/원산지조사 운영에 관한 훈령.pdf",
@@ -61,6 +74,23 @@ LAW_CATEGORIES = {
         "외국환거래법": "laws/외국환거래법.pdf",
         "외국환거래법 시행령": "laws/외국환거래법 시행령.pdf", 
         "외국환거래규정": "laws/외국환거래규정.pdf"
+    },
+    "대외무역거래": {
+        "대외무역법": "laws/대외무역법.pdf",
+        "대외무역법 시행령": "laws/대외무역법 시행령.pdf", 
+        "대외무역관리규정": "laws/대외무역관리규정.pdf",
+        "원산지표시제도 운영에 관한 고시": "laws/원산지표시제도 운영에 관한 고시.pdf",
+    },
+    "환급": {
+        "환급특례법": "laws/수출용 원재료에 대한 관세 등 환급에 관한 특례법.pdf",
+        "환급특례법 시행령": "laws/수출용 원재료에 대한 관세 등 환급에 관한 특례법 시행령.pdf", 
+        "환급특례법 시행규칙": "laws/수출용 원재료에 대한 관세 등 환급에 관한 특례법 시행규칙칙.pdf",
+        "수입물품에 대한 개별소비세와 주세 등의 환급에 관한 고시": "laws/수입물품에 대한 개별소비세와 주세 등의 환급에 관한 고시.pdf",
+        "대체수출물품 관세환급에 따른 수출입통관절차 및 환급처리에 관한 예규":"laws/대체수출물품 관세환급에 따른 수출입통관절차 및 환급처리에 관한 예규.pdf",
+        "수입원재료에 대한 환급방법 조정에 관한 고시": "laws/수입원재료에 대한 환급방법 조정에 관한 고시.pdf",
+        "수출용 원재료에 대한 관세 등 환급사무에 관한 훈령": "laws/수출용 원재료에 대한 관세 등 환급사무에 관한 훈령.pdf",
+        "수출용 원재료에 대한 관세 등 환급사무처리에 관한 고시": "laws/수출용 원재료에 대한 관세 등 환급사무처리에 관한 고시.pdf",
+        "위탁가공 수출물품에 대한 관세 등 환급처리에 관한 예규": "laws/위탁가공 수출물품에 대한 관세 등 환급처리에 관한 예규.pdf",
     }
 }
 
@@ -139,14 +169,11 @@ async def get_law_agent_response_async(law_name, question, history):
 # 응답 지침
 1. 제공된 법령 정보에 기반하여 정확하게 답변해주세요.
 2. 답변에 사용한 모든 법령 출처(법령명, 조항)를 명확히 인용해주세요.
-3. 관련 법조항을 직접 인용하되, 법률 용어는 가능한 쉽게 설명해주세요.
-4. 법령에 명시되지 않은 내용은 추측하지 말고, 알 수 없다고 정직하게 답변해주세요.
-5. 필요한 경우 법령 간의 관계와 위계(법률>시행령>시행규칙>고시)를 설명해주세요.
+3. 법령에 명시되지 않은 내용은 추측하지 말고, 알 수 없다고 정직하게 답변해주세요.
 
 # 답변 형식:
 - 먼저 질문의 핵심을 간략히 요약
 - 적용되는 주요 법령 조항 인용
-- 법령 해석 및 적용 방안 설명
 - 필요시 예외사항이나 추가 고려사항 언급
 
 """
@@ -166,7 +193,7 @@ async def gather_agent_responses(question, history):
 def get_head_agent_response(responses, question, history):
     combined = "\n\n".join([f"=== {n} 전문가 답변 ===\n{r}" for n, r in responses])
     prompt = f"""
-당신은 법령 통합 전문가입니다.
+당신은 관세, 외국환거래, 대외무역법 분야 전문성을 갖춘 법학 교수이자 여러 자료를 통합하여 종합적인 답변을 제공하는 전문가입니다.
 
 {combined}
 
@@ -175,35 +202,19 @@ def get_head_agent_response(responses, question, history):
 
 질문: {question}
 
-다음 단계에 따라 답변을 생성해주세요:
+# 응답 지침
+1 여러 에이전트로부터 받은 답변을 분석하고 통합하여 사용자의 질문에 가장 적합한 최종 답변을 제공합니다.
+2. 제공된 법령 정보에 기반하여 정확하게 답변해주세요.
+3. 답변에 사용한 모든 법령 출처(법령명, 조항)를 명확히 인용해주세요.
+4. 법령에 명시되지 않은 내용은 추측하지 말고, 알 수 없다고 정직하게 답변해주세요.
+5. 모든 답변은 두괄식으로 작성합니다.
 
-1. 질문 분석
-   - 질문의 핵심 주제 파악
-   - 필요한 법령 영역 식별
-   - 관련 키워드 추출
-
-2. 법령 검색
-   - 관련 법령 조항 찾기
-   - 법령 간 연관성 분석
-   - 적용 가능한 예외 조항 확인
-
-3. 해석 및 적용
-   - 법령의 구체적인 내용 해석
-   - 실제 사례에 적용 방안 검토
-   - 예외 상황 고려
-
-4. 답변 구성
-   - 법령 근거 명시, 반드시 주어진 법령에 기반하여 답변변
-   - 단계별 설명 제공
-   - 필요한 경우 예시 제시
-
-위 구조에 따라 단계별 추론을 명확히 보여주면서 최종 통합 답변을 작성해주세요.
 """
     return get_model().generate_content(prompt).text
 
 # --- UI: 카테고리 선택 ---
 with st.expander("카테고리 선택 (선택사항)", expanded=True):
-    c1, c2, c3, c4 = st.columns(4)
+    c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
     with c1:
         if st.button("관세조사", use_container_width=True):  # Updated button label
             st.session_state.selected_category = "관세조사"  # Updated category name
@@ -211,18 +222,36 @@ with st.expander("카테고리 선택 (선택사항)", expanded=True):
             st.session_state.last_used_category = "관세조사"  # Updated category name
             st.rerun()
     with c2:
+        if st.button("관세평가", use_container_width=True):
+            st.session_state.selected_category = "관세평가"
+            st.session_state.law_data = load_law_data("관세평가")
+            st.session_state.last_used_category = "관세평가"
+            st.rerun()
+    with c3:
         if st.button("자유무역협정", use_container_width=True):
             st.session_state.selected_category = "자유무역협정"
             st.session_state.law_data = load_law_data("자유무역협정")
             st.session_state.last_used_category = "자유무역협정"
             st.rerun()
-    with c3:
+    with c4:
         if st.button("외국환거래", use_container_width=True):
             st.session_state.selected_category = "외국환거래"
             st.session_state.law_data = load_law_data("외국환거래")
             st.session_state.last_used_category = "외국환거래"
             st.rerun()
-    with c4:
+    with c5:
+        if st.button("대외무역거래", use_container_width=True):
+            st.session_state.selected_category = "대외무역거래"
+            st.session_state.law_data = load_law_data("대외무역거래")
+            st.session_state.last_used_category = "대외무역거래"
+            st.rerun()
+    with c6:
+        if st.button("환급", use_container_width=True):
+            st.session_state.selected_category = "환급"
+            st.session_state.law_data = load_law_data("환급")
+            st.session_state.last_used_category = "환급"
+            st.rerun()
+    with c7:
         if st.button("자동 분석", use_container_width=True):
             st.session_state.selected_category = None
             st.session_state.law_data = load_law_data()
@@ -259,24 +288,35 @@ with st.sidebar:
 다음 법령들을 기반으로 답변을 제공합니다:
 
 **관세조사 관련:**
-- 관세법
-- 관세법 시행령
-- 관세법 시행규칙
+- 관세법, 시행령, 시행규칙
 - 관세평가 운영에 관한 고시
 - 관세조사 운영에 관한 훈령
+                
+**관세평가 관련:**
+- 관세와무역에관한일반협정제7조, 
+- WTO관세평가협정, TCCV기술문서, 권고의견, 사례연구, 연구, 해설
+- WCO Customs Valuation Archer
 
 **자유무역협정 관련:**
 - 원산지조사 운영에 관한 훈령
 - 자유무역협정 원산지인증수출자 운영에 관한 고시
-- 자유무역협정의 이행을 위한 관세법의 특례에 관한 법률
-- 자유무역협정의 이행을 위한 관세법의 특례에 관한 법률 시행령
-- 자유무역협정의 이행을 위한 관세법의 특례에 관한 법률 시행규칙
-- 자유무역협정의 이행을 위한 관세법의 특례에 관한 법률 사무처리에 관한 고시
+- 자유무역협정의 이행을 위한 관세법의 특례에 관한 법률, 시행령, 시행규칙, 사무처리에 관한 고시
 
 **외국환거래 관련:**
-- 외국환거래법
-- 외국환거래법 시행령
-- 외국환거래규정
+- 외국환거래법, 시행령, 규정
+                
+**대외무역거래 관련:**
+- 대외무역법, 시행령, 관리규정
+- 원산지표시제도 운영에 관한 고시
+                
+**환급 관련:**
+- 수출용 원재료에 대한 관세 등 환급에 관한 특례법, 시행령, 시행규칙
+- 수입물품에 대한 개별소비세와 주세 등의 환급에 관한 고시
+- 대체수출물품 관세환급에 따른 수출입통관절차 및 환급처리에 관한 예규
+- 수입원재료에 대한 환급방법 조정에 관한 고시
+- 수출용 원재료에 대한 관세 등 환급사무에 관한 훈령
+- 수출용 원재료에 대한 관세 등 환급사무처리에 관한 고시
+- 위탁가공 수출물품에 대한 관세 등 환급처리에 관한 예규
 """)
     if st.button("새 채팅 시작", type="primary"):
         st.session_state.chat_history = []
