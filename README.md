@@ -164,6 +164,6 @@ python-dotenv         # 환경변수 관리
 
 ---
 
-**개발자**: KCS Law Chatbot Team  
+**개발자**: Yeonsoo CHOI  
 **라이선스**: MIT License  
 **업데이트**: 2024년 최신 법령 반영
