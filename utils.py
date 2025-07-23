@@ -430,11 +430,17 @@ def classify_question_category(question):
     return "관세조사"  # 기본 카테고리로 설정
 
 # 법령별 에이전트 응답 (async) (수정)
-async def get_law_agent_response_async(law_name, question, history, expanded_keywords): # expanded_keywords 인자 추가
+async def get_law_agent_response_async(law_name, question, history, expanded_keywords):
     # 임베딩 데이터가 없으면 생성
     if law_name not in st.session_state.embedding_data:
-        text = st.session_state.law_data.get(law_name, "")
-        vec, mat, chunks = create_embeddings_for_text(text)
+        law_data = st.session_state.law_data.get(law_name, "")
+        
+        # 데이터 타입에 따라 적절한 임베딩 함수 호출
+        if isinstance(law_data, list):  # JSON 형식 (조문 리스트)
+            vec, mat, chunks = create_embeddings_for_json(law_data)
+        else:  # 텍스트 형식
+            vec, mat, chunks = create_embeddings_for_text(law_data)
+            
         st.session_state.embedding_data[law_name] = (vec, mat, chunks)
     else:
         vec, mat, chunks = st.session_state.embedding_data[law_name]
