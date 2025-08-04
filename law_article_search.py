@@ -84,7 +84,10 @@ def display_search_results(results):
             st.markdown(f"**{article['조번호']} ({article.get('제목', '제목 없음')})**")
 
         # 하이라이트된 내용 표시
-        st.markdown(result['matched_content'], unsafe_allow_html=True)
+        formatted = result['matched_content'].replace('\n', '<br>')
+        st.markdown(
+            f"<div style='white-space: pre-wrap;'>{formatted}</div>", 
+            unsafe_allow_html=True)
         
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -115,4 +118,5 @@ def render_law_search_ui(law_data_dict):
         else:
             with st.spinner("법령을 검색하고 있습니다..."):
                 search_results = search_laws(search_term, selected_laws, law_data_dict)
+
                 display_search_results(search_results)
