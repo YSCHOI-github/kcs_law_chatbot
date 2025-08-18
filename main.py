@@ -1,21 +1,31 @@
+# 법령 통합 챗봇 - ./laws 폴더에서 사전 다운로드된 패키지 로드
 import streamlit as st
-import google.generativeai as genai
-from dotenv import load_dotenv
+from google import genai
 import os
+import json
 import asyncio
+import concurrent.futures
+from pathlib import Path
+import glob
+
+# 분리된 핵심 로직 함수들을 utils.py에서 가져옵니다.
 from utils import (
-    LAW_CATEGORIES,
-    load_law_data,
-    classify_question_category,
-    gather_agent_responses,
-    get_head_agent_response
+    process_json_data,
+    analyze_query,
+    get_agent_response,
+    get_head_agent_response_stream
 )
 from law_article_search import render_law_search_ui
 
 # --- 환경 변수 및 Gemini API 설정 ---
-load_dotenv()
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
-genai.configure(api_key=GOOGLE_API_KEY)
+client = genai.Client(api_key=GOOGLE_API_KEY)
 
 # Streamlit 페이지 설정
 st.set_page_config(
@@ -29,162 +39,488 @@ if 'chat_history' not in st.session_state:
     st.session_state.chat_history = []
 if 'law_data' not in st.session_state:
     st.session_state.law_data = {}
-if 'selected_category' not in st.session_state:
-    st.session_state.selected_category = None
-if 'last_used_category' not in st.session_state:
-    st.session_state.last_used_category = None
-# 임베딩 캐싱용 상태
 if 'embedding_data' not in st.session_state:
     st.session_state.embedding_data = {}
-# 재사용 가능한 asyncio 이벤트 루프
 if 'event_loop' not in st.session_state:
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     st.session_state.event_loop = loop
+if 'collected_laws' not in st.session_state:
+    st.session_state.collected_laws = {}
+if 'search_weights' not in st.session_state:
+    st.session_state.search_weights = {'content': 1.0, 'title': 0.0}
+if 'packages_loaded' not in st.session_state:
+    st.session_state.packages_loaded = False
+if 'selected_packages' not in st.session_state:
+    st.session_state.selected_packages = []
+if 'package_cache' not in st.session_state:
+    st.session_state.package_cache = {}
+if 'current_selected_packages' not in st.session_state:
+    st.session_state.current_selected_packages = []
 
-# --- UI: 카테고리 선택 ---
-with st.expander("카테고리 선택 (선택사항)", expanded=True):
-    c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
-    with c1:
-        if st.button("관세조사", use_container_width=True):
-            st.session_state.selected_category = "관세조사"
-            st.session_state.law_data = load_law_data("관세조사")
-            st.session_state.last_used_category = "관세조사"
-            st.rerun()
-    with c2:
-        if st.button("관세평가", use_container_width=True):
-            st.session_state.selected_category = "관세평가"
-            st.session_state.law_data = load_law_data("관세평가")
-            st.session_state.last_used_category = "관세평가"
-            st.rerun()
-    with c3:
-        if st.button("자유무역협정", use_container_width=True):
-            st.session_state.selected_category = "자유무역협정"
-            st.session_state.law_data = load_law_data("자유무역협정")
-            st.session_state.last_used_category = "자유무역협정"
-            st.rerun()
-    with c4:
-        if st.button("외국환거래", use_container_width=True):
-            st.session_state.selected_category = "외국환거래"
-            st.session_state.law_data = load_law_data("외국환거래")
-            st.session_state.last_used_category = "외국환거래"
-            st.rerun()
-    with c5:
-        if st.button("대외무역거래", use_container_width=True):
-            st.session_state.selected_category = "대외무역거래"
-            st.session_state.law_data = load_law_data("대외무역거래")
-            st.session_state.last_used_category = "대외무역거래"
-            st.rerun()
-    with c6:
-        if st.button("환급", use_container_width=True):
-            st.session_state.selected_category = "환급"
-            st.session_state.law_data = load_law_data("환급")
-            st.session_state.last_used_category = "환급"
-            st.rerun()
-    with c7:
-        if st.button("AI 자동 분류", use_container_width=True):
-            st.session_state.selected_category = "auto_classify"
-            st.session_state.last_used_category = "auto_classify"
-            st.rerun()
-
-# 선택된 카테고리 상태 표시
-if st.session_state.selected_category:
-    if st.session_state.selected_category == "auto_classify":
-        st.info("AI가 질문을 분석하여 자동으로 관련 카테고리를 선택합니다.")
-    else:
-        st.info(f"선택된 카테고리: {st.session_state.selected_category}")
-else:
-    st.info("카테고리를 선택하거나 AI 자동 분류를 이용해주세요.")
-
-# --- UI: 메인 (탭으로 기능 분리) ---
-tab1, tab2 = st.tabs(["💬 AI 법률 챗봇", "🔍 법령 원문 검색"])
-
-# 챗봇 탭
-with tab1:
-    # 대화 기록 렌더링
-    for msg in st.session_state.chat_history:
-        with st.chat_message(msg['role']):
-            st.markdown(msg['content'])
-
-    # 사용자 입력 및 응답 처리
-    if user_input := st.chat_input("질문을 입력하세요"):
-        st.session_state.chat_history.append({"role": "user", "content": user_input})
-
-        with st.chat_message("assistant"):
-            with st.spinner("답변 생성 중..."):
-                # 자동 분류 모드이거나 카테고리 선택이 안된 경우
-                if st.session_state.get('selected_category') == "auto_classify" or not st.session_state.get('selected_category'):
-                    category = classify_question_category(user_input)
-                    st.session_state.law_data = load_law_data(category)
-                    st.write(f"🔍 AI 분석 결과: '{category}' 카테고리와 관련된 질문으로 판단되어 해당 법령을 참조합니다.")
-
-                history = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.chat_history])
-                
-                # 1. 각 법령 에이전트로부터 답변 수집
-                responses = st.session_state.event_loop.run_until_complete(
-                    gather_agent_responses(user_input, history)
-                )
-
-                # 2. 헤드 에이전트가 답변 통합 및 최종 답변 생성
-                answer = get_head_agent_response(responses, user_input, history)
-                
-                # 3. 최종 답변 출력
-                st.markdown(answer)
-                st.session_state.chat_history.append({"role": "assistant", "content": answer})
-
-                # 4. 각 에이전트의 개별 답변을 expander로 제공
-                with st.expander("🤖 각 AI 에이전트 답변 보기"):
-                    if responses:
-                        for law_name, response_text in responses:
-                            st.markdown(f"**📚 {law_name}**")
-                            st.markdown(response_text)
-                            st.markdown("---")
-
-# 법령 검색 탭
-with tab2:
-    # law_article_search.py에서 만든 UI 렌더링 함수 호출
-    # st.session_state.law_data를 인자로 전달합니다.
-    render_law_search_ui(st.session_state.law_data)
-
-# 사이드바 안내
-with st.sidebar:
-    st.markdown("""
-### ℹ️ 사용 안내
-
-다음 법령들을 기반으로 답변을 제공합니다:
-
-**관세조사 관련:**
-- 관세법, 시행령, 시행규칙
-- 관세평가 운영에 관한 고시
-- 관세조사 운영에 관한 훈령
-                
-**관세평가 관련:**
-- 관세와무역에관한일반협정제7조, 
-- WTO관세평가협정, TCCV기술문서, 권고의견, 사례연구, 연구, 해설
-- WCO Customs Valuation Archer
-
-**자유무역협정 관련:**
-- 원산지조사 운영에 관한 훈령
-- 자유무역협정 원산지인증수출자 운영에 관한 고시
-- 자유무역협정의 이행을 위한 관세법의 특례에 관한 법률, 시행령, 시행규칙, 사무처리에 관한 고시
-
-**외국환거래 관련:**
-- 외국환거래법, 시행령, 규정
-                
-**대외무역거래 관련:**
-- 대외무역법, 시행령, 관리규정
-- 원산지표시제도 운영에 관한 고시
-                
-**환급 관련:**
-- 수출용 원재료에 대한 관세 등 환급에 관한 특례법, 시행령, 시행규칙
-- 수입물품에 대한 개별소비세와 주세 등의 환급에 관한 고시
-- 대체수출물품 관세환급에 따른 수출입통관절차 및 환급처리에 관한 예규
-- 수입원재료에 대한 환급방법 조정에 관한 고시
-- 수출용 원재료에 대한 관세 등 환급사무에 관한 훈령
-- 수출용 원재료에 대한 관세 등 환급사무처리에 관한 고시
-- 위탁가공 수출물품에 대한 관세 등 환급처리에 관한 예규
-""")
+# --- 함수 정의 ---
+def get_available_packages():
+    """사용 가능한 패키지 목록 조회"""
+    laws_dir = Path("./laws")
+    if not laws_dir.exists():
+        return {}
     
-    if st.button("새 채팅 시작", type="primary"):
-        st.session_state.chat_history = []
+    json_files = list(laws_dir.glob("*.json"))
+    package_names = {
+        "customs_investigation": "관세조사",
+        "foreign_exchange_investigation": "외환조사", 
+        "foreign_trade": "대외무역",
+        "free_trade_agreement": "자유무역협정",
+        "refund": "환급"
+    }
+    
+    available_packages = {}
+    for json_file in json_files:
+        package_id = json_file.stem
+        package_name = package_names.get(package_id, package_id)
+        
+        try:
+            with open(json_file, 'r', encoding='utf-8') as f:
+                package_data = json.load(f)
+            
+            law_count = len(package_data)
+            article_count = sum(len(law_info['data']) for law_info in package_data.values())
+            
+            available_packages[package_id] = {
+                'name': package_name,
+                'law_count': law_count,
+                'article_count': article_count,
+                'laws': list(package_data.keys())
+            }
+        except Exception as e:
+            st.error(f"❌ {package_name} 패키지 정보 읽기 실패: {str(e)}")
+    
+    return available_packages
+
+def load_selected_packages(selected_package_ids, auto_process=False):
+    """선택된 패키지들만 로드 (캐시 지원) - 이전 패키지는 캐시에만 저장"""
+    if not selected_package_ids:
+        st.warning("선택된 패키지가 없습니다.")
+        return
+    
+    laws_dir = Path("./laws")
+    package_names = {
+        "customs_investigation": "관세조사",
+        "foreign_exchange_investigation": "외환조사", 
+        "foreign_trade": "대외무역",
+        "free_trade_agreement": "자유무역협정",
+        "refund": "환급"
+    }
+    
+    # 현재 로드된 데이터를 캐시에 저장 (이전 선택이 있었다면)
+    if st.session_state.selected_packages and st.session_state.collected_laws:
+        previous_cache_key = "_".join(sorted(st.session_state.selected_packages))
+        st.session_state.package_cache[previous_cache_key] = {
+            'collected_laws': st.session_state.collected_laws.copy(),
+            'law_data': st.session_state.law_data.copy(),
+            'embedding_data': st.session_state.embedding_data.copy()
+        }
+    
+    # 기존 데이터 초기화 (새로 선택된 패키지만 사용)
+    st.session_state.collected_laws = {}
+    st.session_state.law_data = {}
+    st.session_state.embedding_data = {}
+    
+    # 캐시 키 생성
+    cache_key = "_".join(sorted(selected_package_ids))
+    
+    # 캐시에서 로드 시도
+    if cache_key in st.session_state.package_cache:
+        if not auto_process:
+            with st.spinner("캐시에서 법령 패키지를 로드하는 중..."):
+                st.session_state.collected_laws = st.session_state.package_cache[cache_key]['collected_laws'].copy()
+                st.session_state.law_data = st.session_state.package_cache[cache_key]['law_data'].copy()
+                st.session_state.embedding_data = st.session_state.package_cache[cache_key]['embedding_data'].copy()
+                st.session_state.packages_loaded = True
+                st.session_state.selected_packages = selected_package_ids
+                
+                total_laws = len(st.session_state.collected_laws)
+                total_articles = sum(len(law_info['data']) for law_info in st.session_state.collected_laws.values())
+                st.success(f"🚀 캐시에서 로드 완료: {total_laws}개 법령, {total_articles}개 조문")
+        else:
+            # 자동 처리 시에는 메시지 없이 로드
+            st.session_state.collected_laws = st.session_state.package_cache[cache_key]['collected_laws'].copy()
+            st.session_state.law_data = st.session_state.package_cache[cache_key]['law_data'].copy()
+            st.session_state.embedding_data = st.session_state.package_cache[cache_key]['embedding_data'].copy()
+            st.session_state.packages_loaded = True
+            st.session_state.selected_packages = selected_package_ids
+        return
+    
+    # 캐시에 없으면 파일에서 로드
+    if not auto_process:
+        loading_msg = "선택된 법령 패키지를 로드하는 중..."
+    else:
+        loading_msg = "선택된 법령 패키지를 자동 로드하는 중..."
+        
+    with st.spinner(loading_msg):
+        total_laws = 0
+        total_articles = 0
+        
+        for package_id in selected_package_ids:
+            json_file = laws_dir / f"{package_id}.json"
+            package_name = package_names.get(package_id, package_id)
+            
+            if not json_file.exists():
+                st.error(f"❌ {package_name} 패키지 파일이 없습니다: {json_file}")
+                continue
+                
+            try:
+                with open(json_file, 'r', encoding='utf-8') as f:
+                    package_data = json.load(f)
+                
+                # 패키지 내 각 법령을 세션에 추가
+                for law_name, law_info in package_data.items():
+                    # 타입에 따른 분류
+                    if law_info['type'] == 'law':
+                        type_name = '법률 API'
+                    elif law_info['type'] == 'admin':
+                        type_name = '행정규칙 API'
+                    elif law_info['type'] == 'three_stage':
+                        type_name = '3단비교 API'
+                    else:
+                        type_name = '기타 API'
+                    
+                    st.session_state.collected_laws[law_name] = {
+                        'type': type_name,
+                        'data': law_info['data'],
+                        'package': package_name
+                    }
+                    total_laws += 1
+                    total_articles += len(law_info['data'])
+                
+                if not auto_process:
+                    st.success(f"✅ {package_name} 패키지 로드 완료")
+                
+            except Exception as e:
+                st.error(f"❌ {package_name} 패키지 로드 실패: {str(e)}")
+        
+        st.session_state.packages_loaded = True
+        st.session_state.selected_packages = selected_package_ids
+        
+        if auto_process:
+            # 자동 처리인 경우 바로 데이터 변환까지 수행
+            process_all_loaded_laws(silent=True)
+            
+            # 캐시에 저장
+            st.session_state.package_cache[cache_key] = {
+                'collected_laws': st.session_state.collected_laws.copy(),
+                'law_data': st.session_state.law_data.copy(),
+                'embedding_data': st.session_state.embedding_data.copy()
+            }
+        else:
+            st.success(f"🎉 선택된 패키지 로드 완료: {total_laws}개 법령, {total_articles}개 조문")
+
+def process_all_loaded_laws(silent=False):
+    """로드된 모든 법령 데이터를 처리"""
+    if not st.session_state.collected_laws:
+        if not silent:
+            st.warning("로드된 법령 데이터가 없습니다.")
+        return
+    
+    if not silent:
+        spinner_msg = "법령 데이터를 처리하고 있습니다..."
+    else:
+        spinner_msg = "법령 데이터를 자동 처리하고 있습니다..."
+        
+    with st.spinner(spinner_msg):
+        st.session_state.law_data = {}
+        st.session_state.embedding_data = {}
+        
+        for name, law_info in st.session_state.collected_laws.items():
+            json_data = law_info['data']
+            result = process_json_data(name, json_data)
+            processed_name, vec, title_vec, mat, title_mat, chunks, chunk_count = result
+            
+            if vec is not None:
+                st.session_state.law_data[processed_name] = "processed"
+                st.session_state.embedding_data[processed_name] = (vec, title_vec, mat, title_mat, chunks)
+                if not silent:
+                    st.success(f"✅ {processed_name} 처리 완료 ({chunk_count}개 조항)")
+            else:
+                if not silent:
+                    st.error(f"❌ {processed_name} 처리 실패")
+        
+        if not silent:
+            st.success("모든 법령 데이터 처리가 완료되었습니다!")
+
+def start_new_chat():
+    """새 대화를 시작하는 함수"""
+    st.session_state.chat_history = []
+    st.success("새 대화가 시작되었습니다!")
+    st.rerun()
+
+# --- UI: 메인 ---
+st.title("📚 법령 통합 챗봇")
+
+# 메인 화면 상단에 패키지 선택 박스 (간단하게, main_ref.py 스타일)
+available_packages = get_available_packages()
+
+if available_packages:
+    st.markdown("---")
+    
+    # 패키지 선택 박스들을 횡으로 나열 (라디오 버튼으로 단일 선택)
+    cols = st.columns(len(available_packages) + 1)
+    
+    # 선택 옵션 생성 (선택 안함 포함)
+    package_options = ["선택 안함"] + [f"📂 {info['name']}" for info in available_packages.values()]
+    package_ids = [None] + list(available_packages.keys())
+    
+    # 현재 선택된 패키지의 인덱스 찾기
+    current_index = 0
+    if st.session_state.current_selected_packages:
+        for i, pkg_id in enumerate(package_ids[1:], 1):
+            if pkg_id in st.session_state.current_selected_packages:
+                current_index = i
+                break
+    
+    # 라디오 버튼으로 단일 선택
+    with cols[0]:
+        if st.button("🚫 선택 안함", type="secondary" if current_index != 0 else "primary"):
+            current_selection = []
+            st.session_state.current_selected_packages = []
+            st.session_state.packages_loaded = False
+            st.session_state.selected_packages = []
+            st.session_state.collected_laws = {}
+            st.session_state.law_data = {}
+            st.session_state.embedding_data = {}
+            st.rerun()
+    
+    current_selection = []
+    for i, (package_id, package_info) in enumerate(available_packages.items(), 1):
+        with cols[i]:
+            is_selected = package_id in st.session_state.current_selected_packages
+            button_type = "primary" if is_selected else "secondary"
+            
+            if st.button(f"📂 {package_info['name']}", type=button_type):
+                current_selection = [package_id]
+    
+    # 버튼 클릭으로 선택이 변경된 경우 처리
+    if current_selection and set(current_selection) != set(st.session_state.current_selected_packages):
+        st.session_state.current_selected_packages = current_selection
+        # 선택된 패키지가 있으면 자동으로 로드하고 처리 (캐시 포함)
+        # auto_process=True로 설정하여 챗봇용 데이터로 완전히 변환까지 수행
+        load_selected_packages(current_selection, auto_process=True)
         st.rerun()
+
+# 사이드바 (항상 표시)
+with st.sidebar:
+    st.header("📦 법령 패키지 정보")
+    
+    # 패키지 상세 설명 (고정 내용)
+    with st.expander("📖 패키지 상세 설명", expanded=True):
+        st.markdown("""
+        **🏛️ 관세조사 패키지**
+        - 관세법, 관세법 시행령, 관세법 시행규칙
+        - 관세평가 운영에 관한 고시, 관세조사 운영에 관한 훈령
+        
+        **💱 외환조사 패키지**
+        - 외국환거래법, 외국환거래법 시행령
+        - 외국환거래규정
+        
+        **🌍 대외무역 패키지**
+        - 대외무역법, 대외무역법 시행령
+        - 대외무역관리규정
+        
+        **🤝 자유무역협정 패키지**
+        - 자유무역협정 이행을 위한 관세법의 특례에 관한 법률, 시행령, 시행규칙
+        - 사무처리 고시, 원산지 조사 운영 훈령, 원산지인증수출자 운영 고시
+        
+        **💰 환급 패키지**
+        - 수출용 원재료에 대한 관세 등 환급에 관한 특례법, 시행령, 시행규칙
+        - 환급사무처리 고시, 위탁가공 환급처리 예규, 환급사무 훈령 등
+        """)
+    
+    st.markdown("---")
+
+# 패키지가 로드되지 않은 경우 안내 메시지
+if not st.session_state.packages_loaded:
+    if not available_packages:
+        st.error("📁 ./laws 폴더에 패키지가 없습니다.")
+        st.info("💡 download_packages.py를 먼저 실행하여 법령 패키지를 다운로드하세요.")
+        st.code("python download_packages.py", language="bash")
+        st.stop()
+    
+    st.info("💡 위에서 사용할 법령 패키지를 선택하면 자동으로 로드됩니다.")
+
+else:
+    # 패키지가 로드된 경우 사이드바에 추가 정보 표시
+    with st.sidebar:
+        st.header("📊 로드된 데이터 현황")
+        
+        # 로드된 패키지 정보 표시
+        if st.session_state.collected_laws:
+            # 패키지별 그룹화
+            packages = {}
+            for law_name, law_info in st.session_state.collected_laws.items():
+                package = law_info.get('package', '기타')
+                if package not in packages:
+                    packages[package] = []
+                packages[package].append((law_name, len(law_info['data'])))
+            
+            # 현재 로드된 패키지 정보 표시
+            with st.expander("📋 현재 로드된 법령", expanded=True):
+                for package_name, laws in packages.items():
+                    st.subheader(f"📂 {package_name}")
+                    total_articles = sum(article_count for _, article_count in laws)
+                    st.caption(f"{len(laws)}개 법령, {total_articles}개 조문")
+                    
+                    for law_name, article_count in laws:
+                        st.markdown(f"• **{law_name}** ({article_count}개 조문)")
+        
+        st.markdown("---")
+        
+        # 데이터 처리 상태 표시
+        if st.session_state.law_data:
+            st.success("✅ 챗봇 사용 준비 완료")
+            st.info(f"현재 {len(st.session_state.law_data)}개 법령 사용 가능")
+        
+        st.markdown("---")
+        st.header("💬 대화 관리")
+        if st.button("🔄 새 대화 시작", use_container_width=True):
+            start_new_chat()
+        
+        if st.session_state.chat_history:
+            st.info(f"현재 대화 수: {len([msg for msg in st.session_state.chat_history if msg['role'] == 'user'])}개")
+
+    # 검색 설정 패널 (패키지 로드된 경우에만 표시)
+    if st.session_state.packages_loaded:
+        with st.expander("⚙️ 검색 설정", expanded=True):
+            search_mode = st.radio(
+                "🔍 답변 참고 조문 검색 모드 선택",
+                options=["📄 내용 전용 모드(일반적인 경우)", "🤝 조문 제목+내용 균형 모드(각 조문 제목이 상세한 법령 검색에 적합)"],
+                index=0 if st.session_state.search_weights['title'] == 0.0 else 1,
+                help="균형 모드: 제목과 내용을 50:50으로 검색 | 내용 전용: 제목을 무시하고 내용만 검색"
+            )
+            
+            # 선택에 따라 가중치 설정
+            if "내용 전용 모드" in search_mode:
+                title_weight = 0.0
+                content_weight = 1.0
+            elif "균형 모드" in search_mode:
+                title_weight = 0.5
+                content_weight = 0.5
+            else:
+                title_weight = 0.0
+                content_weight = 1.0
+            
+            # 세션 상태 업데이트
+            if st.session_state.search_weights['title'] != title_weight:
+                st.session_state.search_weights = {
+                    'content': content_weight,
+                    'title': title_weight
+                }
+                st.success(f"검색 모드가 변경되었습니다: {search_mode}")
+        
+        st.markdown("---")
+        
+        # 탭으로 챗봇과 검색 기능 분리
+        tab1, tab2 = st.tabs(["💬 AI 챗봇", "🔍 법령 검색"])
+
+        with tab1:
+            if st.session_state.law_data:
+                st.info(f"현재 {len(st.session_state.law_data)}개의 법령이 처리되어 사용 가능합니다: {', '.join(st.session_state.law_data.keys())}")
+            
+            # 채팅 컨테이너
+            chat_container = st.container()
+            
+            with chat_container:
+                # 대화 히스토리 표시
+                for msg in st.session_state.chat_history:
+                    with st.chat_message(msg['role']):
+                        st.markdown(msg['content'])
+
+            # 질문 입력창
+            if user_input := st.chat_input("질문을 입력하세요"):
+                if not st.session_state.law_data:
+                    st.warning("먼저 사이드바에서 법령 패키지를 로드하고 처리해주세요.")
+                    st.stop()
+                
+                # 사용자 메시지를 히스토리에 추가하고 즉시 표시
+                st.session_state.chat_history.append({"role": "user", "content": user_input})
+                
+                # 채팅 컨테이너 내에서 새 메시지들을 렌더링
+                with chat_container:
+                    with st.chat_message("user"):
+                        st.markdown(user_input)
+                    
+                    # 챗봇 답변 생성 로직
+                    with st.chat_message("assistant"):
+                        full_answer = ""
+                        
+                        try:
+                            with st.status("답변 생성 중...", expanded=True) as status:
+                                history = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.chat_history])
+                                search_weights = st.session_state.search_weights
+                                
+                                # 1. 질문 분석
+                                status.update(label="1/3: 질문 분석 중...", state="running")
+                                original_query, similar_queries, expanded_keywords = analyze_query(user_input, st.session_state.collected_laws, search_weights)
+                                
+                                with st.expander("🔍 쿼리 분석 결과"):
+                                    st.markdown(f"**원본 질문:** {original_query}")
+                                    st.markdown("**유사 질문:**")
+                                    st.markdown('\n'.join([f'- {q}' for q in similar_queries]))
+                                    st.markdown(f"**확장 키워드:** {expanded_keywords}")
+
+                                # 2. 법령별 답변 생성
+                                status.update(label="2/3: 법령별 답변 생성 중...", state="running")
+                                
+                                law_names = list(st.session_state.law_data.keys())
+                                
+                                # ThreadPoolExecutor로 병렬 처리 (최대 5개)
+                                with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(law_names), 5)) as executor:
+                                    futures = {
+                                        executor.submit(
+                                            get_agent_response,
+                                            law_name, user_input, history, st.session_state.embedding_data, expanded_keywords, search_weights
+                                        ): law_name for law_name in law_names
+                                    }
+                                
+                                agent_responses = []
+                                for future in concurrent.futures.as_completed(futures):
+                                    law_name, response = future.result()
+                                    agent_responses.append((law_name, response))
+                                    
+                                    # 완료된 법령별 답변을 바로 표시
+                                    with st.container():
+                                        st.markdown(f"**📚 {law_name}**")
+                                        st.markdown(response)
+
+                                # 3. 최종 답변 종합
+                                status.update(label="3/3: 최종 답변 종합 중...", state="running")
+                                status.update(label="✅ 답변 취합 완료", state="complete", expanded=False)
+
+                            # 최종 답변 스트리밍 표시
+                            st.markdown("---")
+                            st.markdown("### 🎯 **최종 통합 답변**")
+                            
+                            # 스트리밍 답변 표시용 플레이스홀더
+                            answer_placeholder = st.empty()
+                            
+                            # 스트리밍 답변 생성 및 표시
+                            for chunk in get_head_agent_response_stream(agent_responses, user_input, history):
+                                full_answer += chunk
+                                # 실시간으로 답변 업데이트
+                                answer_placeholder.markdown(full_answer + " ▌")
+                            
+                            # 최종 완성된 답변 표시
+                            answer_placeholder.markdown(full_answer)
+                            
+                            # 세션 히스토리에 저장
+                            if full_answer:
+                                st.session_state.chat_history.append({"role": "assistant", "content": full_answer})
+
+                        except Exception as e:
+                            error_msg = f"답변 생성 중 오류가 발생했습니다: {str(e)}"
+                            st.error(error_msg)
+                            st.session_state.chat_history.append({"role": "assistant", "content": error_msg})
+        
+        with tab2:
+            render_law_search_ui(st.session_state.collected_laws)
+
+# 초기 설정은 사용자 선택에 맡김

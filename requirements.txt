@@ -1,9 +1,6 @@
-python-dotenv
-streamlit
-google-generativeai
-PyPDF2
-asyncio
+streamlit 
+scikit-learn 
+google-genai
 numpy
-scikit-learn    # TF-IDF 및 코사인 유사도 계산
-pandas          # 데이터 처리 및 관리
+python-dotenv
 pdfminer.six
