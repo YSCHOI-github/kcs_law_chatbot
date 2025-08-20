@@ -167,6 +167,30 @@ class LawAPI:
                         content += "\n" + " ".join(str(i) for i in ho_content)
                     else:
                         content += "\n" + str(ho_content)
+                
+                # 목 데이터가 있는 경우 목 내용 추가
+                if "목" in subitem:
+                    content += self._extract_all_content_from_mok(subitem["목"])
+        
+        return content
+    
+    def _extract_all_content_from_mok(self, mok_items) -> str:
+        """목 데이터에서 모든 텍스트 내용을 추출"""
+        content = ""
+        
+        # mok_items가 딕셔너리 하나인 경우에도 처리하도록 수정
+        if isinstance(mok_items, dict):
+            mok_items = [mok_items]  # 리스트로 변환하여 반복문 처리
+
+        if isinstance(mok_items, list):
+            for mok_item in mok_items:
+                mok_content = mok_item.get("목내용")
+                if mok_content:
+                    # 목내용이 리스트인 경우 문자열로 변환
+                    if isinstance(mok_content, list):
+                        content += "\n" + " ".join(str(i) for i in mok_content)
+                    else:
+                        content += "\n" + str(mok_content)
         
         return content
     
