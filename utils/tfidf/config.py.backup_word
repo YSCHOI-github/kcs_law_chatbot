@@ -18,33 +18,16 @@ LEGAL_STOPWORDS = [
 ]
 
 # TF-IDF 벡터화 기본 파라미터
-# 변경 이력: 2025-10-06 - Word-based에서 Character n-gram으로 전환
-# 이유: 테스트 결과 Character n-gram이 부분 매칭, 오타 허용, 복합어 처리에서 우수
-# 성능: Top-1 평균 유사도 0.097 → 0.179 (약 85% 향상)
 TFIDF_CONFIG = {
-    'ngram_range': (2, 4),           # 2~4 글자 조합 (Character n-gram)
-    'analyzer': 'char',              # 문자 기반 분석
-    'min_df': 2,                     # 최소 2개 문서 (노이즈 감소)
-    'max_df': 0.85,                  # 최대 85% 문서
+    'ngram_range': (1, 2),           # 1-gram + 2-gram
+    'stop_words': LEGAL_STOPWORDS,   # 법령 불용어
+    'min_df': 1,                     # 최소 문서 빈도
+    'max_df': 0.8,                   # 최대 문서 빈도 (80% 이상 등장하면 제외)
     'sublinear_tf': True,            # log 스케일링 적용
     'use_idf': True,                 # IDF 가중치 사용
     'smooth_idf': True,              # IDF 평활화
-    'norm': 'l2',                    # L2 정규화
-    'lowercase': True                # 소문자 변환
+    'norm': 'l2'                     # L2 정규화
 }
-
-# 이전 Word-based 설정 (백업용 참고)
-# TFIDF_CONFIG_WORD_BACKUP = {
-#     'ngram_range': (1, 2),
-#     'analyzer': 'word',
-#     'stop_words': LEGAL_STOPWORDS,
-#     'min_df': 1,
-#     'max_df': 0.8,
-#     'sublinear_tf': True,
-#     'use_idf': True,
-#     'smooth_idf': True,
-#     'norm': 'l2'
-# }
 
 # 검색 기본 설정
 SEARCH_CONFIG = {

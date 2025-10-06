@@ -1,0 +1,187 @@
+{
+  "test_metadata": {
+    "law_package": "customs_investigation",
+    "description": "Word-based vs Char-based TF-IDF 성능 비교 테스트",
+    "total_queries": 22,
+    "categories": {
+      "user_requested": 4,
+      "exact_term": 3,
+      "partial_match": 3,
+      "typo_tolerance": 3,
+      "compound_word": 3,
+      "semantic_search": 3,
+      "practical": 3
+    }
+  },
+  "test_cases": [
+    {
+      "id": 1,
+      "category": "user_requested",
+      "query": "가산세 종류",
+      "expected_keywords": ["가산세", "종류", "납부지연가산세", "신고불성실가산세"],
+      "note": "관세법에서 규정하는 다양한 가산세 유형 검색"
+    },
+    {
+      "id": 2,
+      "category": "user_requested",
+      "query": "관세부과 제척기간",
+      "expected_keywords": ["제척기간", "부과제척기간", "5년", "10년"],
+      "note": "관세 부과 권한의 시효 검색"
+    },
+    {
+      "id": 3,
+      "category": "user_requested",
+      "query": "수입물품 과세가격에 권리사용료를 가산하기 위한 요건",
+      "expected_keywords": ["권리사용료", "과세가격", "가산", "요건", "로열티"],
+      "note": "복잡한 과세가격 결정 요건 - 긴 질문"
+    },
+    {
+      "id": 4,
+      "category": "user_requested",
+      "query": "과세가격 가산요건 및 공제요건 비교",
+      "expected_keywords": ["과세가격", "가산", "공제", "요건"],
+      "note": "비교 질문 - 여러 조문 참조 필요"
+    },
+    {
+      "id": 5,
+      "category": "exact_term",
+      "query": "관세조사란 무엇인가?",
+      "expected_keywords": ["관세조사", "정의"],
+      "expected_article": "제2조",
+      "note": "정의 조항 검색"
+    },
+    {
+      "id": 6,
+      "category": "exact_term",
+      "query": "신의성실 원칙은?",
+      "expected_keywords": ["신의성실"],
+      "expected_article": "제6조",
+      "note": "특정 조문 검색"
+    },
+    {
+      "id": 7,
+      "category": "exact_term",
+      "query": "납세의무자는?",
+      "expected_keywords": ["납세의무자"],
+      "expected_article": "제19조",
+      "note": "특정 개념 검색"
+    },
+    {
+      "id": 8,
+      "category": "partial_match",
+      "query": "관세징수우선권",
+      "expected_keywords": ["관세징수", "우선"],
+      "expected_article": "제3조",
+      "note": "띄어쓰기 없는 복합어 - 관세징수의 우선"
+    },
+    {
+      "id": 9,
+      "category": "partial_match",
+      "query": "수입신고수리전반출",
+      "expected_keywords": ["수입신고수리전", "반출"],
+      "note": "띄어쓰기 없는 긴 복합어"
+    },
+    {
+      "id": 10,
+      "category": "partial_match",
+      "query": "납부기한연장",
+      "expected_keywords": ["납부", "기한", "연장"],
+      "expected_article": "제10조",
+      "note": "복합어 - 천재지변 등으로 인한 기한의 연장"
+    },
+    {
+      "id": 11,
+      "category": "typo_tolerance",
+      "query": "관세조가",
+      "expected_keywords": ["관세조사"],
+      "expected_article": "제2조",
+      "note": "오타 - 관세조사 (사->가)"
+    },
+    {
+      "id": 12,
+      "category": "typo_tolerance",
+      "query": "과세표주",
+      "expected_keywords": ["과세표준"],
+      "expected_article": "제15조",
+      "note": "오타 - 과세표준 (준->주)"
+    },
+    {
+      "id": 13,
+      "category": "typo_tolerance",
+      "query": "납세의문자",
+      "expected_keywords": ["납세의무자"],
+      "expected_article": "제19조",
+      "note": "오타 - 납세의무자 (무->문)"
+    },
+    {
+      "id": 14,
+      "category": "compound_word",
+      "query": "전자상거래",
+      "expected_keywords": ["전자상거래물품"],
+      "expected_article": "제2조",
+      "note": "복합어의 일부 - 전자상거래물품"
+    },
+    {
+      "id": 15,
+      "category": "compound_word",
+      "query": "탁송",
+      "expected_keywords": ["탁송품"],
+      "expected_article": "제2조",
+      "note": "복합어의 일부 - 탁송품"
+    },
+    {
+      "id": 16,
+      "category": "compound_word",
+      "query": "보세구역",
+      "expected_keywords": ["특허보세구역", "보세구역"],
+      "note": "복합어 포함 조문 검색"
+    },
+    {
+      "id": 17,
+      "category": "semantic_search",
+      "query": "관세는 다른 세금보다 우선되나요?",
+      "expected_keywords": ["관세", "우선", "조세"],
+      "expected_article": "제3조",
+      "note": "자연어 질문 - 관세징수의 우선"
+    },
+    {
+      "id": 18,
+      "category": "semantic_search",
+      "query": "수입물품에 부가세는 누가 징수하나요?",
+      "expected_keywords": ["수입물품", "부가가치세", "내국세", "세관장"],
+      "expected_article": "제4조",
+      "note": "자연어 질문 - 내국세등의 부과징수"
+    },
+    {
+      "id": 19,
+      "category": "semantic_search",
+      "query": "관세 납부는 언제까지 해야 하나요?",
+      "expected_keywords": ["납부기한", "15일"],
+      "expected_article": "제9조",
+      "note": "자연어 질문 - 관세의 납부기한"
+    },
+    {
+      "id": 20,
+      "category": "practical",
+      "query": "과세가격 결정방법",
+      "expected_keywords": ["과세가격", "결정", "거래가격"],
+      "note": "실무 질문 - 과세가격 결정"
+    },
+    {
+      "id": 21,
+      "category": "practical",
+      "query": "환적과 복합환적의 차이",
+      "expected_keywords": ["환적", "복합환적"],
+      "expected_article": "제2조",
+      "note": "실무 질문 - 용어 비교"
+    },
+    {
+      "id": 22,
+      "category": "practical",
+      "query": "장부보관 기간",
+      "expected_keywords": ["장부", "증거서류", "보관", "5년"],
+      "expected_article": "제12조",
+      "note": "실무 질문 - 보관 의무"
+    }
+  ]
+}
