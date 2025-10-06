@@ -24,7 +24,7 @@ LEGAL_STOPWORDS = [
 TFIDF_CONFIG = {
     'ngram_range': (2, 4),           # 2~4 글자 조합 (Character n-gram)
     'analyzer': 'char',              # 문자 기반 분석
-    'min_df': 2,                     # 최소 2개 문서 (노이즈 감소)
+    'min_df': 1,                     # 최소 1개 문서
     'max_df': 0.85,                  # 최대 85% 문서
     'sublinear_tf': True,            # log 스케일링 적용
     'use_idf': True,                 # IDF 가중치 사용
