@@ -10,3 +10,7 @@ previously/
 # 캐시
 __pycache__/
 *.py[cod]
+cache/
+
+# 테스트 결과 파일
+test_*results*.json
