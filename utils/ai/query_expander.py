@@ -11,56 +11,15 @@ from typing import List
 class QueryExpander:
     """Gemini를 사용한 쿼리 확장 (키워드 추출, 유사질문 생성)"""
 
-    def __init__(self, title_terms: List[str] = None, stopwords: List[str] = None):
+    def __init__(self, title_terms: List[str] = None):
         """QueryExpander 초기화
 
         Args:
             title_terms: 법령 제목 용어 리스트
-            stopwords: 불용어 리스트
         """
         api_key = os.getenv('GOOGLE_API_KEY')
         self.client = genai.Client(api_key=api_key)
         self.title_terms = title_terms or []
-
-        # 불용어 설정
-        if stopwords is None:
-            # tfidf.config에서 가져오기
-            from ..tfidf.config import LEGAL_STOPWORDS
-            self.stopwords = LEGAL_STOPWORDS
-        else:
-            self.stopwords = stopwords
-
-    def clean_keywords_with_stopwords(self, keywords_text: str) -> str:
-        """키워드에서 불용어 제거 (TF-IDF와 동일한 전처리)
-
-        Args:
-            keywords_text: 공백으로 구분된 키워드 문자열
-
-        Returns:
-            불용어가 제거된 키워드 문자열
-        """
-        words = keywords_text.split()
-        cleaned_words = []
-
-        for word in words:
-            # 단어 끝의 조사/불용어 제거
-            cleaned_word = word
-            for stopword in self.stopwords:
-                if word.endswith(stopword):
-                    cleaned_word = word[:-len(stopword)]
-                    break
-
-            # 정리된 단어가 유효하고 불용어가 아닌 경우 추가
-            if cleaned_word and len(cleaned_word) >= 2 and cleaned_word not in self.stopwords:
-                cleaned_words.append(cleaned_word)
-                # 원본 단어도 함께 추가 (매칭 다양성 확보)
-                if cleaned_word != word and word not in self.stopwords:
-                    cleaned_words.append(word)
-            elif word not in self.stopwords and len(word) >= 2:
-                # 원본 단어가 불용어가 아니면 그대로 추가
-                cleaned_words.append(word)
-
-        return ' '.join(list(set(cleaned_words)))  # 중복 제거
 
     def extract_keywords_and_synonyms(self, query: str, search_weights: dict = None) -> str:
         """키워드 추출 및 유사어 생성 - 제목 가중치 설정에 따라 다른 전략 사용
@@ -126,15 +85,14 @@ class QueryExpander:
             # 불필요한 문자 제거하고 단어들만 추출
             keywords = re.findall(r'[가-힣]{2,}', keywords_text)
 
-            # TF-IDF와 동일한 불용어 처리 적용
-            cleaned_keywords = self.clean_keywords_with_stopwords(' '.join(keywords))
-            return cleaned_keywords
+            # 중복 제거하여 반환
+            return ' '.join(list(set(keywords)))
 
         except Exception as e:
             print(f"키워드 추출 오류: {e}")
-            # 폴백: 원본 쿼리에서 한글 단어 추출 후 불용어 처리
+            # 폴백: 원본 쿼리에서 한글 단어 추출
             fallback_keywords = re.findall(r'[가-힣]{2,}', query)
-            return self.clean_keywords_with_stopwords(' '.join(fallback_keywords))
+            return ' '.join(list(set(fallback_keywords)))
 
     def generate_similar_questions(self, original_query: str, search_weights: dict = None) -> List[str]:
         """유사한 질문 생성 - 제목 가중치 설정에 따라 다른 전략 사용

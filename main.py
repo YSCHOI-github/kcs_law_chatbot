@@ -13,7 +13,7 @@ from utils import (
     process_json_data,
     analyze_query,
     get_agent_response,
-    get_head_agent_response_stream
+    get_head_agent_response
 )
 from law_article_search import render_law_search_ui
 
@@ -451,17 +451,17 @@ else:
                     # 챗봇 답변 생성 로직
                     with st.chat_message("assistant"):
                         full_answer = ""
-                        
+
                         try:
                             with st.status("답변 생성 중...", expanded=True) as status:
                                 history = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.chat_history])
                                 search_weights = st.session_state.search_weights
-                                
+
                                 # 1. 질문 분석
                                 status.update(label="1/3: 질문 분석 중...", state="running")
                                 original_query, similar_queries, expanded_keywords = analyze_query(user_input, st.session_state.collected_laws, search_weights)
-                                
-                                with st.expander("🔍 쿼리 분석 결과"):
+
+                                with st.expander("🔍 쿼리 분석 결과", expanded=False):
                                     st.markdown(f"**원본 질문:** {original_query}")
                                     st.markdown("**유사 질문:**")
                                     st.markdown('\n'.join([f'- {q}' for q in similar_queries]))
@@ -469,48 +469,53 @@ else:
 
                                 # 2. 법령별 답변 생성
                                 status.update(label="2/3: 법령별 답변 생성 중...", state="running")
-                                
-                                law_names = list(st.session_state.law_data.keys())
-                                
-                                # ThreadPoolExecutor로 병렬 처리 (최대 5개)
-                                with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(law_names), 5)) as executor:
-                                    futures = {
-                                        executor.submit(
-                                            get_agent_response,
-                                            law_name, user_input, history, st.session_state.embedding_data, expanded_keywords, search_weights
-                                        ): law_name for law_name in law_names
-                                    }
-                                
+                                status.update(label="✅ 질문 분석 완료", state="complete", expanded=False)
+
+                            # 각 AI 답변을 status 위젯에 실시간 표시
+                            agent_status = st.status("📚 각 법령별 상세 답변 생성 중...", expanded=True)
+
+                            law_names = list(st.session_state.law_data.keys())
+
+                            # 각 법령별로 플레이스홀더 생성 (실시간 업데이트용)
+                            placeholders = {}
+                            with agent_status:
+                                for law_name in law_names:
+                                    placeholders[law_name] = st.empty()
+
+                            # ThreadPoolExecutor로 병렬 처리 (최대 5개)
+                            with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(law_names), 5)) as executor:
+                                futures = {
+                                    executor.submit(
+                                        get_agent_response,
+                                        law_name, user_input, history, st.session_state.embedding_data, expanded_keywords, search_weights
+                                    ): law_name for law_name in law_names
+                                }
+
                                 agent_responses = []
                                 for future in concurrent.futures.as_completed(futures):
                                     law_name, response = future.result()
                                     agent_responses.append((law_name, response))
-                                    
-                                    # 완료된 법령별 답변을 바로 표시
-                                    with st.container():
+
+                                    # 완료되는 순서대로 즉시 해당 플레이스홀더에 출력
+                                    with placeholders[law_name].container():
                                         st.markdown(f"**📚 {law_name}**")
                                         st.markdown(response)
+                                        st.markdown("---")
 
-                                # 3. 최종 답변 종합
-                                status.update(label="3/3: 최종 답변 종합 중...", state="running")
-                                status.update(label="✅ 답변 취합 완료", state="complete", expanded=False)
+                            # 모든 답변 수집 완료 후 status 닫기
+                            agent_status.update(label="✅ 각 법령별 상세 답변 생성 완료", state="complete", expanded=False)
 
-                            # 최종 답변 스트리밍 표시
+                            # 최종 답변 표시
                             st.markdown("---")
-                            st.markdown("### 🎯 **최종 통합 답변**")
-                            
-                            # 스트리밍 답변 표시용 플레이스홀더
-                            answer_placeholder = st.empty()
-                            
-                            # 스트리밍 답변 생성 및 표시
-                            for chunk in get_head_agent_response_stream(agent_responses, user_input, history):
-                                full_answer += chunk
-                                # 실시간으로 답변 업데이트
-                                answer_placeholder.markdown(full_answer + " ▌")
-                            
-                            # 최종 완성된 답변 표시
-                            answer_placeholder.markdown(full_answer)
-                            
+                            st.markdown("## 🎯 최종 통합 답변")
+
+                            # 답변 생성
+                            with st.spinner("최종 통합 답변 생성 중..."):
+                                full_answer = get_head_agent_response(agent_responses, user_input, history)
+
+                            # 답변 표시
+                            st.markdown(full_answer)
+
                             # 세션 히스토리에 저장
                             if full_answer:
                                 st.session_state.chat_history.append({"role": "assistant", "content": full_answer})

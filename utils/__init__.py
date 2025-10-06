@@ -22,6 +22,7 @@ from .ai import (
     QueryExpander,
     QueryPreprocessor,  # 하위 호환성
     get_agent_response,
+    get_head_agent_response,
     get_head_agent_response_stream,
     get_model,
     get_model_head
@@ -112,6 +113,7 @@ __all__ = [
     # AI
     'QueryExpander',
     'get_agent_response',
+    'get_head_agent_response',
     'get_head_agent_response_stream',
     'get_model',
     'get_model_head',

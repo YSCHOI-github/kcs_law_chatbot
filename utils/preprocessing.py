@@ -3,7 +3,6 @@
 법령 데이터 전처리 및 용어 추출 기능을 제공합니다.
 """
 import re
-from .tfidf.config import LEGAL_STOPWORDS
 
 
 def extract_title_terms_from_laws(collected_laws: dict) -> list:
@@ -13,7 +12,11 @@ def extract_title_terms_from_laws(collected_laws: dict) -> list:
         collected_laws: {law_name: {'type': ..., 'data': [...]}} 형태의 딕셔너리
 
     Returns:
-        불용어가 제거된 제목 용어 리스트 (정렬됨)
+        제목 용어 리스트 (정렬됨)
+
+    Note:
+        불용어 제거를 하지 않습니다. 법령 제목에서는 "방법", "기준", "절차" 등
+        모든 단어가 법적 의미를 가질 수 있기 때문입니다.
     """
     title_terms = set()
 
@@ -29,6 +32,4 @@ def extract_title_terms_from_laws(collected_laws: dict) -> list:
                 terms = re.findall(r'[가-힣]{2,}', cleaned_title)
                 title_terms.update(terms)
 
-    # 불용어 제거
-    filtered_terms = [term for term in title_terms if term not in LEGAL_STOPWORDS]
-    return sorted(list(filtered_terms))
+    return sorted(list(title_terms))
