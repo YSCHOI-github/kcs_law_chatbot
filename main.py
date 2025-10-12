@@ -57,6 +57,10 @@ if 'package_cache' not in st.session_state:
     st.session_state.package_cache = {}
 if 'current_selected_packages' not in st.session_state:
     st.session_state.current_selected_packages = []
+if 'uploaded_laws' not in st.session_state:
+    st.session_state.uploaded_laws = {}
+if 'show_upload_ui' not in st.session_state:
+    st.session_state.show_upload_ui = False
 
 # --- 함수 정의 ---
 def get_available_packages():
@@ -102,35 +106,40 @@ def load_selected_packages(selected_package_ids, auto_process=False):
     if not selected_package_ids:
         st.warning("선택된 패키지가 없습니다.")
         return
-    
+
     laws_dir = Path("./laws")
     package_names = {
         "customs_investigation": "관세조사",
-        "foreign_exchange_investigation": "외환조사", 
+        "foreign_exchange_investigation": "외환조사",
         "foreign_trade": "대외무역",
         "free_trade_agreement": "자유무역협정",
-        "refund": "환급"
+        "refund": "환급",
+        "user_upload": "사용자 업로드"
     }
     
     # 현재 로드된 데이터를 캐시에 저장 (이전 선택이 있었다면)
+    # user_upload 제외한 패키지만 캐시 저장
     if st.session_state.selected_packages and st.session_state.collected_laws:
-        previous_cache_key = "_".join(sorted(st.session_state.selected_packages))
-        st.session_state.package_cache[previous_cache_key] = {
-            'collected_laws': st.session_state.collected_laws.copy(),
-            'law_data': st.session_state.law_data.copy(),
-            'embedding_data': st.session_state.embedding_data.copy()
-        }
+        previous_cache_packages = [pid for pid in st.session_state.selected_packages if pid != 'user_upload']
+        if previous_cache_packages:
+            previous_cache_key = "_".join(sorted(previous_cache_packages))
+            st.session_state.package_cache[previous_cache_key] = {
+                'collected_laws': st.session_state.collected_laws.copy(),
+                'law_data': st.session_state.law_data.copy(),
+                'embedding_data': st.session_state.embedding_data.copy()
+            }
     
     # 기존 데이터 초기화 (새로 선택된 패키지만 사용)
     st.session_state.collected_laws = {}
     st.session_state.law_data = {}
     st.session_state.embedding_data = {}
-    
-    # 캐시 키 생성
-    cache_key = "_".join(sorted(selected_package_ids))
-    
-    # 캐시에서 로드 시도
-    if cache_key in st.session_state.package_cache:
+
+    # 캐시 키 생성 (user_upload 제외)
+    cache_packages = [pid for pid in selected_package_ids if pid != 'user_upload']
+    cache_key = "_".join(sorted(cache_packages)) if cache_packages else None
+
+    # 캐시에서 로드 시도 (cache_key가 있는 경우만)
+    if cache_key and cache_key in st.session_state.package_cache:
         if not auto_process:
             with st.spinner("캐시에서 법령 패키지를 로드하는 중..."):
                 st.session_state.collected_laws = st.session_state.package_cache[cache_key]['collected_laws'].copy()
@@ -138,7 +147,7 @@ def load_selected_packages(selected_package_ids, auto_process=False):
                 st.session_state.embedding_data = st.session_state.package_cache[cache_key]['embedding_data'].copy()
                 st.session_state.packages_loaded = True
                 st.session_state.selected_packages = selected_package_ids
-                
+
                 total_laws = len(st.session_state.collected_laws)
                 total_articles = sum(len(law_info['data']) for law_info in st.session_state.collected_laws.values())
                 st.success(f"🚀 캐시에서 로드 완료: {total_laws}개 법령, {total_articles}개 조문")
@@ -149,6 +158,19 @@ def load_selected_packages(selected_package_ids, auto_process=False):
             st.session_state.embedding_data = st.session_state.package_cache[cache_key]['embedding_data'].copy()
             st.session_state.packages_loaded = True
             st.session_state.selected_packages = selected_package_ids
+
+        # user_upload가 있으면 추가로 로드
+        if 'user_upload' in selected_package_ids:
+            if st.session_state.uploaded_laws:
+                for law_name, law_info in st.session_state.uploaded_laws.items():
+                    st.session_state.collected_laws[law_name] = {
+                        'type': law_info['type'],
+                        'data': law_info['data'],
+                        'package': '사용자 업로드'
+                    }
+                # 추가된 법령 처리 (TF-IDF 벡터화)
+                process_all_loaded_laws(silent=True)
+
         return
     
     # 캐시에 없으면 파일에서 로드
@@ -160,19 +182,42 @@ def load_selected_packages(selected_package_ids, auto_process=False):
     with st.spinner(loading_msg):
         total_laws = 0
         total_articles = 0
-        
+
         for package_id in selected_package_ids:
-            json_file = laws_dir / f"{package_id}.json"
             package_name = package_names.get(package_id, package_id)
-            
+
+            # "사용자 업로드" 패키지 처리
+            if package_id == "user_upload":
+                if not st.session_state.uploaded_laws:
+                    if not auto_process:
+                        st.warning("업로드된 법령이 없습니다.")
+                    continue
+
+                # uploaded_laws를 collected_laws로 복사
+                for law_name, law_info in st.session_state.uploaded_laws.items():
+                    st.session_state.collected_laws[law_name] = {
+                        'type': law_info['type'],
+                        'data': law_info['data'],
+                        'package': package_name
+                    }
+                    total_laws += 1
+                    total_articles += len(law_info['data'])
+
+                if not auto_process:
+                    st.success(f"✅ {package_name} 패키지 로드 완료")
+                continue
+
+            # 기존 JSON 파일 기반 패키지 로드
+            json_file = laws_dir / f"{package_id}.json"
+
             if not json_file.exists():
                 st.error(f"❌ {package_name} 패키지 파일이 없습니다: {json_file}")
                 continue
-                
+
             try:
                 with open(json_file, 'r', encoding='utf-8') as f:
                     package_data = json.load(f)
-                
+
                 # 패키지 내 각 법령을 세션에 추가
                 for law_name, law_info in package_data.items():
                     # 타입에 따른 분류
@@ -184,7 +229,7 @@ def load_selected_packages(selected_package_ids, auto_process=False):
                         type_name = '3단비교 API'
                     else:
                         type_name = '기타 API'
-                    
+
                     st.session_state.collected_laws[law_name] = {
                         'type': type_name,
                         'data': law_info['data'],
@@ -192,10 +237,10 @@ def load_selected_packages(selected_package_ids, auto_process=False):
                     }
                     total_laws += 1
                     total_articles += len(law_info['data'])
-                
+
                 if not auto_process:
                     st.success(f"✅ {package_name} 패키지 로드 완료")
-                
+
             except Exception as e:
                 st.error(f"❌ {package_name} 패키지 로드 실패: {str(e)}")
         
@@ -205,13 +250,14 @@ def load_selected_packages(selected_package_ids, auto_process=False):
         if auto_process:
             # 자동 처리인 경우 바로 데이터 변환까지 수행
             process_all_loaded_laws(silent=True)
-            
-            # 캐시에 저장
-            st.session_state.package_cache[cache_key] = {
-                'collected_laws': st.session_state.collected_laws.copy(),
-                'law_data': st.session_state.law_data.copy(),
-                'embedding_data': st.session_state.embedding_data.copy()
-            }
+
+            # 캐시에 저장 (cache_key가 있는 경우만 - user_upload 단독 선택 시 제외)
+            if cache_key:
+                st.session_state.package_cache[cache_key] = {
+                    'collected_laws': st.session_state.collected_laws.copy(),
+                    'law_data': st.session_state.law_data.copy(),
+                    'embedding_data': st.session_state.embedding_data.copy()
+                }
         else:
             st.success(f"🎉 선택된 패키지 로드 완료: {total_laws}개 법령, {total_articles}개 조문")
 
@@ -262,9 +308,10 @@ available_packages = get_available_packages()
 
 if available_packages:
     st.markdown("---")
-    
+
     # 패키지 선택 박스들을 횡으로 나열 (라디오 버튼으로 단일 선택)
-    cols = st.columns(len(available_packages) + 1)
+    # "사용자 업로드" 버튼 추가를 위해 +2
+    cols = st.columns(len(available_packages) + 2)
     
     # 선택 옵션 생성 (선택 안함 포함)
     package_options = ["선택 안함"] + [f"📂 {info['name']}" for info in available_packages.values()]
@@ -295,24 +342,117 @@ if available_packages:
         with cols[i]:
             is_selected = package_id in st.session_state.current_selected_packages
             button_type = "primary" if is_selected else "secondary"
-            
+
             if st.button(f"📂 {package_info['name']}", type=button_type):
                 current_selection = [package_id]
-    
+                st.session_state.show_upload_ui = False
+
+    # "사용자 업로드" 버튼 추가 (마지막 컬럼)
+    with cols[len(available_packages) + 1]:
+        is_upload_selected = 'user_upload' in st.session_state.current_selected_packages
+        button_type = "primary" if is_upload_selected else "secondary"
+
+        if st.button("📤 사용자 업로드", type=button_type):
+            current_selection = ['user_upload']
+            st.session_state.show_upload_ui = True
+
     # 버튼 클릭으로 선택이 변경된 경우 처리
     if current_selection and set(current_selection) != set(st.session_state.current_selected_packages):
         st.session_state.current_selected_packages = current_selection
-        # 선택된 패키지가 있으면 자동으로 로드하고 처리 (캐시 포함)
-        # auto_process=True로 설정하여 챗봇용 데이터로 완전히 변환까지 수행
-        load_selected_packages(current_selection, auto_process=True)
+
+        # "사용자 업로드"가 아닌 경우에만 자동 로드
+        if 'user_upload' not in current_selection:
+            # 선택된 패키지가 있으면 자동으로 로드하고 처리 (캐시 포함)
+            # auto_process=True로 설정하여 챗봇용 데이터로 완전히 변환까지 수행
+            load_selected_packages(current_selection, auto_process=True)
+
         st.rerun()
 
 # 사이드바 (항상 표시)
 with st.sidebar:
+    # 조건부: 사용자 업로드 UI 표시
+    if st.session_state.show_upload_ui:
+        st.header("📤 법령 파일 업로드")
+
+        # 파일 업로더 (PDF/TXT, 다중 선택)
+        uploaded_files = st.file_uploader(
+            "법령 파일 선택 (PDF/TXT)",
+            type=['pdf', 'txt'],
+            accept_multiple_files=True,
+            help="최대 200MB까지 업로드 가능 (Streamlit 기본 제한)"
+        )
+
+        # 업로드 버튼
+        if st.button("📥 업로드 및 처리", use_container_width=True):
+            if uploaded_files:
+                from utils import process_uploaded_files
+
+                with st.spinner("파일 처리 중..."):
+                    # 파일 처리 (JSON 변환)
+                    new_laws = process_uploaded_files(uploaded_files)
+
+                    # 세션 스테이트에 저장
+                    st.session_state.uploaded_laws.update(new_laws)
+
+                    # 자동으로 패키지 로드 및 처리
+                    if new_laws:
+                        load_selected_packages(['user_upload'], auto_process=True)
+                        st.success(f"{len(new_laws)}개 법령 업로드 완료!")
+                        st.rerun()
+            else:
+                st.warning("업로드할 파일을 선택해주세요.")
+
+        # 업로드된 법령 목록 표시
+        if st.session_state.uploaded_laws:
+            st.markdown("---")
+            st.subheader("업로드된 법령")
+
+            for law_name in list(st.session_state.uploaded_laws.keys()):
+                cols = st.columns([3, 1, 1])
+                article_count = len(st.session_state.uploaded_laws[law_name]['data'])
+                cols[0].write(f"📄 {law_name} ({article_count}개 조문)")
+
+                # JSON 다운로드 버튼
+                law_data = st.session_state.uploaded_laws[law_name]['data']
+                json_str = json.dumps(law_data, ensure_ascii=False, indent=2)
+
+                cols[1].download_button(
+                    label="📥",
+                    data=json_str,
+                    file_name=f"{law_name}.json",
+                    mime="application/json",
+                    key=f"download_{law_name}",
+                    help="JSON 다운로드"
+                )
+
+                # 삭제 버튼
+                if cols[2].button("🗑️", key=f"del_{law_name}", help="삭제"):
+                    # 해당 법령 삭제
+                    del st.session_state.uploaded_laws[law_name]
+
+                    # collected_laws에서도 삭제 (있는 경우)
+                    if law_name in st.session_state.collected_laws:
+                        del st.session_state.collected_laws[law_name]
+
+                    # embedding_data에서도 삭제 (있는 경우)
+                    if law_name in st.session_state.embedding_data:
+                        del st.session_state.embedding_data[law_name]
+
+                    # law_data에서도 삭제 (있는 경우)
+                    if law_name in st.session_state.law_data:
+                        del st.session_state.law_data[law_name]
+
+                    st.success(f"{law_name} 삭제 완료")
+                    st.rerun()
+
+        st.markdown("---")
+
+    # 기존 "법령 패키지 정보" 섹션 (조건부 expanded 설정)
     st.header("📦 법령 패키지 정보")
-    
+
     # 패키지 상세 설명 (고정 내용)
-    with st.expander("📖 패키지 상세 설명", expanded=True):
+    # show_upload_ui가 True면 닫힘, False면 열림
+    with st.expander("📖 패키지 상세 설명", expanded=not st.session_state.show_upload_ui):
         st.markdown("""
         **🏛️ 관세조사 패키지**
         - 관세법, 관세법 시행령, 관세법 시행규칙

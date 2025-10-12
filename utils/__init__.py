@@ -31,6 +31,12 @@ from .ai import (
 # 전처리 모듈
 from .preprocessing import extract_title_terms_from_laws
 
+# 파일 업로드 모듈
+from .file_upload import (
+    convert_uploaded_file_to_json,
+    process_uploaded_files
+)
+
 # 통합 분석 함수
 from typing import Tuple, List
 
@@ -120,6 +126,10 @@ __all__ = [
 
     # 전처리
     'extract_title_terms_from_laws',
+
+    # 파일 업로드
+    'convert_uploaded_file_to_json',
+    'process_uploaded_files',
 
     # 통합
     'analyze_query',
