@@ -318,5 +318,4 @@ python-dotenv         # 환경변수 관리
 
 - **개발자**: Yeonsoo CHOI
 - **GitHub**: [YSCHOI-github/kcs_law_chatbot](https://github.com/YSCHOI-github/kcs_law_chatbot)
-- **문의**: GitHub Issues 탭 활용
-- **업데이트**: 2025년 최신 법령 반영
+
