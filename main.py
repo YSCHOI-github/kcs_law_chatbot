@@ -48,7 +48,7 @@ if 'event_loop' not in st.session_state:
 if 'collected_laws' not in st.session_state:
     st.session_state.collected_laws = {}
 if 'search_weights' not in st.session_state:
-    st.session_state.search_weights = {'content': 1.0, 'title': 0.0}
+    st.session_state.search_weights = {'content': 0.5, 'title': 0.5}
 if 'packages_loaded' not in st.session_state:
     st.session_state.packages_loaded = False
 if 'selected_packages' not in st.session_state:
@@ -533,7 +533,7 @@ else:
             search_mode = st.radio(
                 "🔍 답변 참고 조문 검색 모드 선택",
                 options=["📄 내용 전용 모드(일반적인 경우)", "🤝 조문 제목+내용 균형 모드(각 조문 제목이 상세한 법령 검색에 적합)"],
-                index=0 if st.session_state.search_weights['title'] == 0.0 else 1,
+                index=1 if st.session_state.search_weights['title'] == 0.5 else 0,
                 help="균형 모드: 제목과 내용을 50:50으로 검색 | 내용 전용: 제목을 무시하고 내용만 검색"
             )
             

@@ -34,15 +34,15 @@ def search_relevant_chunks(query: str, expanded_keywords: str,
     # 기본 가중치 설정 (안전한 처리)
     try:
         if search_weights is None or not isinstance(search_weights, dict):
-            content_weight = 1.0
-            title_weight = 0.0
+            content_weight = 0.5
+            title_weight = 0.5
         else:
             content_weight = search_weights.get('content', 0.5)
             title_weight = search_weights.get('title', 0.5)
     except Exception as e:
         print(f"가중치 설정 오류: {e}")
-        content_weight = 1.0
-        title_weight = 0.0
+        content_weight = 0.5
+        title_weight = 0.5
 
     try:
         # 1. 원본 쿼리와 미리 확장된 키워드로 검색
