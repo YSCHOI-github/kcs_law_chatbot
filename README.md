@@ -1,4 +1,4 @@
-# 법령 통합 챗봇 (KCS Law Chatbot)
+# ⚖️ 법령 통합 챗봇 (KCS Law Chatbot)
 
 **대한민국 관세·무역 법령 전문 AI 챗봇**
 
