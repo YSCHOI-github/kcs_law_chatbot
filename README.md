@@ -2,7 +2,7 @@
 
 **대한민국 관세·무역 법령 전문 AI 챗봇**
 
-<details>
+<details open>
 <summary>📑 목차</summary>
 
 - [🚀 1인1봇 프로젝트](#-1인1봇-프로젝트)
