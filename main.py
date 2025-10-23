@@ -68,7 +68,7 @@ if 'show_upload_ui' not in st.session_state:
 if 'api_downloaded_laws' not in st.session_state:
     st.session_state.api_downloaded_laws = {}
 if 'selected_mode' not in st.session_state:
-    st.session_state.selected_mode = "사전 패키지 사용"
+    st.session_state.selected_mode = "🌐 법령 API 다운로드"
 if 'upload_key' not in st.session_state:
     st.session_state.upload_key = 0
 
