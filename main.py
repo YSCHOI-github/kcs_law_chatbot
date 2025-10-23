@@ -69,6 +69,8 @@ if 'api_downloaded_laws' not in st.session_state:
     st.session_state.api_downloaded_laws = {}
 if 'selected_mode' not in st.session_state:
     st.session_state.selected_mode = "사전 패키지 사용"
+if 'upload_key' not in st.session_state:
+    st.session_state.upload_key = 0
 
 # --- 함수 정의 ---
 def get_available_packages():
@@ -359,19 +361,20 @@ def download_laws_from_api(law_names, status_placeholder):
                 status_placeholder.error(f"❌ [{idx}/{total_laws}] '{law_name}' 다운로드 실패")
                 continue
 
-            # 2. 3단비교 다운로드
-            status_placeholder.info(f"📥 [{idx}/{total_laws}] '{law_name}' 3단비교 다운로드 중...")
-            three_stage_data = law_api.download_three_stage_comparison_as_json(law_name)
-            if three_stage_data:
-                three_stage_name = f"{law_name}_3단비교"
-                st.session_state.api_downloaded_laws[three_stage_name] = {
-                    'type': 'three_stage',
-                    'data': three_stage_data
-                }
-                status_placeholder.success(f"✅ [{idx}/{total_laws}] '{law_name}_3단비교' 다운로드 완료 ({len(three_stage_data)}개 조문)")
-                success_count += 1
-            else:
-                status_placeholder.warning(f"⚠️ [{idx}/{total_laws}] '{law_name}' 3단비교 데이터를 가져올 수 없습니다.")
+            # 2. 3단비교 다운로드 (법/법률로 끝나는 법령만)
+            if law_name.endswith('법') or law_name.endswith('법률'):
+                status_placeholder.info(f"📥 [{idx}/{total_laws}] '{law_name}' 3단비교 다운로드 중...")
+                three_stage_data = law_api.download_three_stage_comparison_as_json(law_name)
+                if three_stage_data:
+                    three_stage_name = f"{law_name}_3단비교"
+                    st.session_state.api_downloaded_laws[three_stage_name] = {
+                        'type': 'three_stage',
+                        'data': three_stage_data
+                    }
+                    status_placeholder.success(f"✅ [{idx}/{total_laws}] '{law_name}_3단비교' 다운로드 완료 ({len(three_stage_data)}개 조문)")
+                    success_count += 1
+                else:
+                    status_placeholder.warning(f"⚠️ [{idx}/{total_laws}] '{law_name}' 3단비교 데이터를 가져올 수 없습니다.")
 
         except Exception as e:
             status_placeholder.error(f"❌ [{idx}/{total_laws}] '{law_name}' 다운로드 중 오류: {str(e)}")
@@ -460,10 +463,6 @@ def convert_and_load_api_laws():
 # --- UI: 메인 ---
 st.title("📚 법령 통합 챗봇")
 
-# --- 메인 화면: 법령 선택 모드 ---
-st.markdown("---")
-st.header("📚 법령 선택 모드")
-
 # 선택 모드 라디오 버튼
 selection_mode = st.radio(
     "법령 데이터 소스를 선택하세요:",
@@ -477,11 +476,8 @@ if selection_mode != st.session_state.selected_mode:
     st.session_state.selected_mode = selection_mode
     st.rerun()
 
-st.markdown("---")
-
 # 모드별 UI 표시
 if selection_mode == "📂 사전 패키지 사용":
-    st.subheader("📦 사전 패키지 선택")
 
     available_packages = get_available_packages()
 
@@ -509,14 +505,14 @@ if selection_mode == "📂 사전 패키지 사용":
             st.rerun()
 
 elif selection_mode == "📤 사용자 파일 업로드":
-    st.subheader("📤 법령 파일 업로드")
 
     # 파일 업로더
     uploaded_files = st.file_uploader(
         "법령 파일 선택 (PDF/TXT)",
         type=['pdf', 'txt'],
         accept_multiple_files=True,
-        help="최대 200MB까지 업로드 가능"
+        help="최대 200MB까지 업로드 가능",
+        key=f"file_uploader_{st.session_state.upload_key}"
     )
 
     # 업로드 버튼
@@ -545,12 +541,14 @@ elif selection_mode == "📤 사용자 파일 업로드":
 
                     total_articles = sum(len(law_info['data']) for law_info in new_laws.values())
                     st.toast(f"✅ {len(new_laws)}개 법령 업로드 완료! (총 {total_articles}개 조문)", icon="✅")
+
+                    # 파일 업로더 초기화
+                    st.session_state.upload_key += 1
                     st.rerun()
         else:
             st.warning("업로드할 파일을 선택해주세요.")
 
 elif selection_mode == "🌐 법령 API 다운로드":
-    st.subheader("🌐 법령 API에서 다운로드")
 
     # API 키 상태 확인
     has_law_api = LAW_API_KEY is not None and LAW_API_KEY.strip() != ""
@@ -566,7 +564,7 @@ elif selection_mode == "🌐 법령 API 다운로드":
         # 왼쪽: 법률 다운로드
         with col1:
             if has_law_api:
-                st.markdown("#### 📜 법률 다운로드 (법률 + 3단비교 자동)")
+                st.markdown("**📜 법률 다운로드 (법률 + 3단비교 자동)**")
 
                 law_input = st.text_area(
                     "법률명 입력 (콤마로 구분)",
@@ -591,7 +589,7 @@ elif selection_mode == "🌐 법령 API 다운로드":
         # 오른쪽: 행정규칙 다운로드
         with col2:
             if has_admin_api:
-                st.markdown("#### 📋 행정규칙 다운로드")
+                st.markdown("**📋 행정규칙 다운로드**")
 
                 admin_input = st.text_area(
                     "행정규칙명 입력 (콤마로 구분)",
@@ -614,7 +612,6 @@ elif selection_mode == "🌐 법령 API 다운로드":
                 st.info("⚠️ ADMIN_API_KEY가 설정되지 않았습니다.")
 
         # 하단: 데이터 변환 및 로드 버튼 (다운로드된 법령이 있을 때만)
-        st.markdown("---")
         if st.session_state.api_downloaded_laws:
             if st.button("🔄 다운로드된 법령 데이터 변환", key="convert_load", use_container_width=True, type="primary"):
                 if convert_and_load_api_laws():
@@ -653,6 +650,40 @@ with st.sidebar:
         """)
 
     st.markdown("---")
+
+# 패키지가 로드된 경우 사이드바에 추가 정보 표시
+if st.session_state.packages_loaded:
+    with st.sidebar:
+        st.header("📊 로드된 데이터 현황")
+
+        # 로드된 패키지 정보 표시
+        if st.session_state.collected_laws:
+            # 패키지별 그룹화
+            packages = {}
+            for law_name, law_info in st.session_state.collected_laws.items():
+                package = law_info.get('package', '기타')
+                if package not in packages:
+                    packages[package] = []
+                packages[package].append((law_name, len(law_info['data'])))
+
+            # 현재 로드된 패키지 정보 표시
+            with st.expander("📋 현재 로드된 법령", expanded=True):
+                for package_name, laws in packages.items():
+                    st.subheader(f"📂 {package_name}")
+                    total_articles = sum(article_count for _, article_count in laws)
+                    st.caption(f"{len(laws)}개 법령, {total_articles}개 조문")
+
+                    for law_name, article_count in laws:
+                        st.markdown(f"• **{law_name}** ({article_count}개 조문)")
+
+        st.markdown("---")
+
+        # 데이터 처리 상태 표시
+        if st.session_state.law_data:
+            st.success("✅ 챗봇 사용 준비 완료")
+            st.info(f"현재 {len(st.session_state.law_data)}개 법령 사용 가능")
+
+        st.markdown("---")
 
 # 업로드/다운로드된 법령 관리 섹션 (조건부 표시)
 if st.session_state.uploaded_laws or st.session_state.api_downloaded_laws:
@@ -733,40 +764,6 @@ if st.session_state.uploaded_laws or st.session_state.api_downloaded_laws:
                     st.rerun()
 
         st.markdown("---")
-
-# 패키지가 로드된 경우 사이드바에 추가 정보 표시
-if st.session_state.packages_loaded:
-    with st.sidebar:
-        st.header("📊 로드된 데이터 현황")
-        
-        # 로드된 패키지 정보 표시
-        if st.session_state.collected_laws:
-            # 패키지별 그룹화
-            packages = {}
-            for law_name, law_info in st.session_state.collected_laws.items():
-                package = law_info.get('package', '기타')
-                if package not in packages:
-                    packages[package] = []
-                packages[package].append((law_name, len(law_info['data'])))
-            
-            # 현재 로드된 패키지 정보 표시
-            with st.expander("📋 현재 로드된 법령", expanded=True):
-                for package_name, laws in packages.items():
-                    st.subheader(f"📂 {package_name}")
-                    total_articles = sum(article_count for _, article_count in laws)
-                    st.caption(f"{len(laws)}개 법령, {total_articles}개 조문")
-                    
-                    for law_name, article_count in laws:
-                        st.markdown(f"• **{law_name}** ({article_count}개 조문)")
-        
-        st.markdown("---")
-        
-        # 데이터 처리 상태 표시
-        if st.session_state.law_data:
-            st.success("✅ 챗봇 사용 준비 완료")
-            st.info(f"현재 {len(st.session_state.law_data)}개 법령 사용 가능")
-        
-        st.markdown("---")
         st.header("💬 대화 관리")
         if st.button("🔄 새 대화 시작", use_container_width=True):
             start_new_chat()
@@ -835,8 +832,6 @@ if st.session_state.packages_loaded:
                 'title': title_weight
             }
             st.success(f"검색 모드가 변경되었습니다: {search_mode}")
-
-    st.markdown("---")
 
     # 탭으로 챗봇과 검색 기능 분리
     tab1, tab2 = st.tabs(["💬 AI 챗봇", "🔍 법령 검색"])
