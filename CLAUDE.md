@@ -21,8 +21,7 @@ This downloads law packages from the Korean law API and saves them to `./laws/` 
 
 ### Environment Variables Required
 - `GOOGLE_API_KEY` - For Gemini AI models
-- `LAW_API_KEY` - For Korean law API (법령 API)
-- `ADMIN_API_KEY` - For administrative rules API (행정규칙 API)
+- `LAW_API_KEY` - For Korean law API (법령 API) and administrative rules API (행정규칙 API)
 
 ## Architecture
 

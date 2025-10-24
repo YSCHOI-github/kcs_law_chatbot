@@ -57,9 +57,8 @@ except Exception as e:
 
 st.sidebar.markdown("---")
 
-# API 키 로드 (법령 API용 - 환경 변수에서만 로드)
+# API 키 로드 (법령 API용 - 환경 변수에서만 로드, 행정규칙 API와 동일)
 LAW_API_KEY = os.getenv('LAW_API_KEY')
-ADMIN_API_KEY = os.getenv('ADMIN_API_KEY')
 
 # --- 세션 상태 초기화 ---
 if 'chat_history' not in st.session_state:
@@ -412,11 +411,11 @@ def download_admin_rules_from_api(rule_names, status_placeholder):
     """
     from adminapi import AdminAPI, convert_admin_rule_data_to_chatbot_format
 
-    if not ADMIN_API_KEY:
-        status_placeholder.error("ADMIN_API_KEY가 설정되지 않았습니다.")
+    if not LAW_API_KEY:
+        status_placeholder.error("LAW_API_KEY가 설정되지 않았습니다.")
         return 0
 
-    admin_api = AdminAPI(ADMIN_API_KEY)
+    admin_api = AdminAPI(LAW_API_KEY)
     success_count = 0
     total_rules = len(rule_names)
 
@@ -577,10 +576,9 @@ elif selection_mode == "🌐 법령 API 다운로드":
 
     # API 키 상태 확인
     has_law_api = LAW_API_KEY is not None and LAW_API_KEY.strip() != ""
-    has_admin_api = ADMIN_API_KEY is not None and ADMIN_API_KEY.strip() != ""
 
-    if not has_law_api and not has_admin_api:
-        st.warning("⚠️ API 키가 설정되지 않았습니다. .env 파일에 LAW_API_KEY, ADMIN_API_KEY를 추가하세요.")
+    if not has_law_api:
+        st.warning("⚠️ API 키가 설정되지 않았습니다. .env 파일에 LAW_API_KEY를 추가하세요.")
         st.info("💡 다른 모드(사전 패키지, 사용자 업로드)를 선택하여 챗봇을 사용할 수 있습니다.")
     else:
         # 2단 레이아웃: 좌(법률) / 우(행정규칙)
@@ -613,28 +611,25 @@ elif selection_mode == "🌐 법령 API 다운로드":
 
         # 오른쪽: 행정규칙 다운로드
         with col2:
-            if has_admin_api:
-                st.markdown("**📋 행정규칙 다운로드**")
+            st.markdown("**📋 행정규칙 다운로드**")
 
-                admin_input = st.text_area(
-                    "행정규칙명 입력 (콤마로 구분)",
-                    placeholder="예: 관세평가 운영에 관한 고시, 관세조사 운영에 관한 훈령",
-                    height=100,
-                    key="admin_comma_input"
-                )
+            admin_input = st.text_area(
+                "행정규칙명 입력 (콤마로 구분)",
+                placeholder="예: 관세평가 운영에 관한 고시, 관세조사 운영에 관한 훈령",
+                height=100,
+                key="admin_comma_input"
+            )
 
-                if st.button("📥 행정규칙 다운로드", key="download_admins_btn", use_container_width=True, type="primary"):
-                    rule_names = parse_comma_separated_input(admin_input)
-                    if rule_names:
-                        status_placeholder = st.empty()
-                        success_count = download_admin_rules_from_api(rule_names, status_placeholder)
-                        if success_count > 0:
-                            st.toast(f"✅ {success_count}개 법령 다운로드 완료!", icon="✅")
-                            st.rerun()
-                    else:
-                        st.warning("행정규칙명을 입력하세요.")
-            else:
-                st.info("⚠️ ADMIN_API_KEY가 설정되지 않았습니다.")
+            if st.button("📥 행정규칙 다운로드", key="download_admins_btn", use_container_width=True, type="primary"):
+                rule_names = parse_comma_separated_input(admin_input)
+                if rule_names:
+                    status_placeholder = st.empty()
+                    success_count = download_admin_rules_from_api(rule_names, status_placeholder)
+                    if success_count > 0:
+                        st.toast(f"✅ {success_count}개 법령 다운로드 완료!", icon="✅")
+                        st.rerun()
+                else:
+                    st.warning("행정규칙명을 입력하세요.")
 
         # 하단: 데이터 변환 및 로드 버튼 (다운로드된 법령이 있을 때만)
         if st.session_state.api_downloaded_laws:

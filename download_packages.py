@@ -15,13 +15,10 @@ except ImportError:
     print("dotenv 모듈이 없습니다. 시스템 환경변수를 사용합니다.")
 
 LAW_API_KEY = os.getenv('LAW_API_KEY')
-ADMIN_API_KEY = os.getenv('ADMIN_API_KEY')
 
 # API 키가 없으면 사용자 입력 받기
 if not LAW_API_KEY:
     LAW_API_KEY = input("LAW_API_KEY를 입력하세요: ").strip()
-if not ADMIN_API_KEY:
-    ADMIN_API_KEY = input("ADMIN_API_KEY를 입력하세요: ").strip()
 
 # 3가지 패키지 정의
 PACKAGES = {
@@ -203,16 +200,16 @@ def download_package(package_id, package_info, law_api, admin_api):
 
 def main():
     """메인 함수"""
-    if not LAW_API_KEY or not ADMIN_API_KEY:
-        print("❌ 오류: LAW_API_KEY와 ADMIN_API_KEY 환경변수가 필요합니다.")
+    if not LAW_API_KEY:
+        print("❌ 오류: LAW_API_KEY 환경변수가 필요합니다.")
         return
-    
+
     print("🚀 법령 패키지 다운로드 시작")
-    print(f"API 키 확인 - LAW: {'✅' if LAW_API_KEY else '❌'}, ADMIN: {'✅' if ADMIN_API_KEY else '❌'}")
-    
-    # API 클라이언트 초기화
+    print(f"API 키 확인 - LAW: {'✅' if LAW_API_KEY else '❌'}")
+
+    # API 클라이언트 초기화 (LAW_API_KEY는 행정규칙 API에도 사용됨)
     law_api = LawAPI(LAW_API_KEY)
-    admin_api = AdminAPI(ADMIN_API_KEY)
+    admin_api = AdminAPI(LAW_API_KEY)
     
     # 패키지별 다운로드
     for package_id, package_info in PACKAGES.items():
