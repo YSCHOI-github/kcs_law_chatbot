@@ -1,4 +1,4 @@
-# 법령 통합 챗봇 - ./laws 폴더에서 사전 다운로드된 패키지 로드
+# 법령 통합 챗봇 - ./laws 폴더에서 사전 다운로드된 패키지 로드 (사용자 API 키 입력 버전)
 import streamlit as st
 from google import genai
 import os
@@ -17,26 +17,49 @@ from utils import (
 )
 from law_article_search import render_law_search_ui
 
-# --- 환경 변수 및 Gemini API 설정 ---
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ImportError:
-    pass
-
-GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
-client = genai.Client(api_key=GOOGLE_API_KEY)
-
-# API 키 로드 (법령 API용)
-LAW_API_KEY = os.getenv('LAW_API_KEY')
-ADMIN_API_KEY = os.getenv('ADMIN_API_KEY')
-
 # Streamlit 페이지 설정
 st.set_page_config(
     page_title="법령 통합 챗봇",
     page_icon="📚",
     layout="wide"
 )
+
+# --- API 키 입력 UI ---
+st.sidebar.header("🔑 API 키 설정")
+api_key_input = st.sidebar.text_input(
+    "Google API Key 입력",
+    type="password",
+    help="Gemini API를 사용하기 위한 Google API Key를 입력하세요.",
+    placeholder="AIza..."
+)
+
+# API 키가 입력되지 않은 경우 안내 메시지 표시 및 앱 중단
+if not api_key_input:
+    st.warning("⚠️ 사이드바에서 Google API Key를 입력해주세요.")
+    st.info("""
+    ### Google API Key 발급 방법
+    1. [Google AI Studio](https://aistudio.google.com/app/apikey)에 접속
+    2. "API Key 만들기" 버튼 클릭
+    3. 발급받은 키를 사이드바에 입력
+    """)
+    st.stop()
+
+# API 키를 환경 변수에 설정 (utils 모듈에서 사용하도록)
+os.environ['GOOGLE_API_KEY'] = api_key_input
+
+# API 키로 클라이언트 생성
+try:
+    client = genai.Client(api_key=api_key_input)
+    st.sidebar.success("✅ API 키가 설정되었습니다.")
+except Exception as e:
+    st.sidebar.error(f"❌ API 키 설정 실패: {str(e)}")
+    st.stop()
+
+st.sidebar.markdown("---")
+
+# API 키 로드 (법령 API용 - 환경 변수에서만 로드)
+LAW_API_KEY = os.getenv('LAW_API_KEY')
+ADMIN_API_KEY = os.getenv('ADMIN_API_KEY')
 
 # --- 세션 상태 초기화 ---
 if 'chat_history' not in st.session_state:
@@ -71,6 +94,8 @@ if 'selected_mode' not in st.session_state:
     st.session_state.selected_mode = "🌐 법령 API 다운로드"
 if 'upload_key' not in st.session_state:
     st.session_state.upload_key = 0
+if 'confirm_reset' not in st.session_state:
+    st.session_state.confirm_reset = False
 
 # --- 함수 정의 ---
 def get_available_packages():
@@ -78,28 +103,28 @@ def get_available_packages():
     laws_dir = Path("./laws")
     if not laws_dir.exists():
         return {}
-    
+
     json_files = list(laws_dir.glob("*.json"))
     package_names = {
         "customs_investigation": "관세조사",
-        "foreign_exchange_investigation": "외환조사", 
+        "foreign_exchange_investigation": "외환조사",
         "foreign_trade": "대외무역",
         "free_trade_agreement": "자유무역협정",
         "refund": "환급"
     }
-    
+
     available_packages = {}
     for json_file in json_files:
         package_id = json_file.stem
         package_name = package_names.get(package_id, package_id)
-        
+
         try:
             with open(json_file, 'r', encoding='utf-8') as f:
                 package_data = json.load(f)
-            
+
             law_count = len(package_data)
             article_count = sum(len(law_info['data']) for law_info in package_data.values())
-            
+
             available_packages[package_id] = {
                 'name': package_name,
                 'law_count': law_count,
@@ -108,7 +133,7 @@ def get_available_packages():
             }
         except Exception as e:
             st.error(f"❌ {package_name} 패키지 정보 읽기 실패: {str(e)}")
-    
+
     return available_packages
 
 def load_selected_packages(selected_package_ids, auto_process=False):
@@ -126,7 +151,7 @@ def load_selected_packages(selected_package_ids, auto_process=False):
         "refund": "환급",
         "user_upload": "사용자 업로드"
     }
-    
+
     # 현재 로드된 데이터를 캐시에 저장 (이전 선택이 있었다면)
     # user_upload 제외한 패키지만 캐시 저장
     if st.session_state.selected_packages and st.session_state.collected_laws:
@@ -138,7 +163,7 @@ def load_selected_packages(selected_package_ids, auto_process=False):
                 'law_data': st.session_state.law_data.copy(),
                 'embedding_data': st.session_state.embedding_data.copy()
             }
-    
+
     # 기존 데이터 초기화 (새로 선택된 패키지만 사용)
     st.session_state.collected_laws = {}
     st.session_state.law_data = {}
@@ -182,13 +207,13 @@ def load_selected_packages(selected_package_ids, auto_process=False):
                 process_all_loaded_laws(silent=True)
 
         return
-    
+
     # 캐시에 없으면 파일에서 로드
     if not auto_process:
         loading_msg = "선택된 법령 패키지를 로드하는 중..."
     else:
         loading_msg = "선택된 법령 패키지를 자동 로드하는 중..."
-        
+
     with st.spinner(loading_msg):
         total_laws = 0
         total_articles = 0
@@ -253,10 +278,10 @@ def load_selected_packages(selected_package_ids, auto_process=False):
 
             except Exception as e:
                 st.error(f"❌ {package_name} 패키지 로드 실패: {str(e)}")
-        
+
         st.session_state.packages_loaded = True
         st.session_state.selected_packages = selected_package_ids
-        
+
         if auto_process:
             # 자동 처리인 경우 바로 데이터 변환까지 수행
             process_all_loaded_laws(silent=True)
@@ -277,21 +302,21 @@ def process_all_loaded_laws(silent=False):
         if not silent:
             st.warning("로드된 법령 데이터가 없습니다.")
         return
-    
+
     if not silent:
         spinner_msg = "법령 데이터를 처리하고 있습니다..."
     else:
         spinner_msg = "법령 데이터를 자동 처리하고 있습니다..."
-        
+
     with st.spinner(spinner_msg):
         st.session_state.law_data = {}
         st.session_state.embedding_data = {}
-        
+
         for name, law_info in st.session_state.collected_laws.items():
             json_data = law_info['data']
             result = process_json_data(name, json_data)
             processed_name, vec, title_vec, mat, title_mat, chunks, chunk_count = result
-            
+
             if vec is not None:
                 st.session_state.law_data[processed_name] = "processed"
                 st.session_state.embedding_data[processed_name] = (vec, title_vec, mat, title_mat, chunks)
@@ -300,15 +325,9 @@ def process_all_loaded_laws(silent=False):
             else:
                 if not silent:
                     st.error(f"❌ {processed_name} 처리 실패")
-        
+
         if not silent:
             st.success("모든 법령 데이터 처리가 완료되었습니다!")
-
-def start_new_chat():
-    """새 대화를 시작하는 함수"""
-    st.session_state.chat_history = []
-    st.success("새 대화가 시작되었습니다!")
-    st.rerun()
 
 def parse_comma_separated_input(input_str):
     """콤마로 구분된 입력을 리스트로 변환
@@ -346,7 +365,7 @@ def download_laws_from_api(law_names, status_placeholder):
     for idx, law_name in enumerate(law_names, 1):
         try:
             # 1. 일반 법률 다운로드
-            status_placeholder.info(f"📥 [{idx}/{total_laws}] '{law_name}' 법률 다운로드 중...")
+            status_placeholder.info(f"[{idx}/{total_laws}] '{law_name}' 법률 다운로드 중...")
             law_data = law_api.download_law_as_json(law_name)
             if law_data:
                 # 챗봇 형식으로 변환
@@ -355,15 +374,15 @@ def download_laws_from_api(law_names, status_placeholder):
                     'type': 'law',
                     'data': chatbot_data
                 }
-                status_placeholder.success(f"✅ [{idx}/{total_laws}] '{law_name}' 다운로드 완료 ({len(chatbot_data)}개 조문)")
+                status_placeholder.success(f"[{idx}/{total_laws}] '{law_name}' 다운로드 완료 ({len(chatbot_data)}개 조문)")
                 success_count += 1
             else:
-                status_placeholder.error(f"❌ [{idx}/{total_laws}] '{law_name}' 다운로드 실패")
+                status_placeholder.error(f"[{idx}/{total_laws}] '{law_name}' 다운로드 실패")
                 continue
 
             # 2. 3단비교 다운로드 (법/법률로 끝나는 법령만)
             if law_name.endswith('법') or law_name.endswith('법률'):
-                status_placeholder.info(f"📥 [{idx}/{total_laws}] '{law_name}' 3단비교 다운로드 중...")
+                status_placeholder.info(f"[{idx}/{total_laws}] '{law_name}' 3단비교 다운로드 중...")
                 three_stage_data = law_api.download_three_stage_comparison_as_json(law_name)
                 if three_stage_data:
                     three_stage_name = f"{law_name}_3단비교"
@@ -371,13 +390,13 @@ def download_laws_from_api(law_names, status_placeholder):
                         'type': 'three_stage',
                         'data': three_stage_data
                     }
-                    status_placeholder.success(f"✅ [{idx}/{total_laws}] '{law_name}_3단비교' 다운로드 완료 ({len(three_stage_data)}개 조문)")
+                    status_placeholder.success(f"[{idx}/{total_laws}] '{law_name}_3단비교' 다운로드 완료 ({len(three_stage_data)}개 조문)")
                     success_count += 1
                 else:
-                    status_placeholder.warning(f"⚠️ [{idx}/{total_laws}] '{law_name}' 3단비교 데이터를 가져올 수 없습니다.")
+                    status_placeholder.warning(f"[{idx}/{total_laws}] '{law_name}' 3단비교 데이터를 가져올 수 없습니다.")
 
         except Exception as e:
-            status_placeholder.error(f"❌ [{idx}/{total_laws}] '{law_name}' 다운로드 중 오류: {str(e)}")
+            status_placeholder.error(f"[{idx}/{total_laws}] '{law_name}' 다운로드 중 오류: {str(e)}")
 
     return success_count
 
@@ -403,7 +422,7 @@ def download_admin_rules_from_api(rule_names, status_placeholder):
 
     for idx, rule_name in enumerate(rule_names, 1):
         try:
-            status_placeholder.info(f"📥 [{idx}/{total_rules}] '{rule_name}' 다운로드 중...")
+            status_placeholder.info(f"[{idx}/{total_rules}] '{rule_name}' 다운로드 중...")
             rule_data = admin_api.download_admin_rule_as_json(rule_name)
             if rule_data:
                 chatbot_data = convert_admin_rule_data_to_chatbot_format(rule_data)
@@ -411,13 +430,13 @@ def download_admin_rules_from_api(rule_names, status_placeholder):
                     'type': 'admin',
                     'data': chatbot_data
                 }
-                status_placeholder.success(f"✅ [{idx}/{total_rules}] '{rule_name}' 다운로드 완료 ({len(chatbot_data)}개 조문)")
+                status_placeholder.success(f"[{idx}/{total_rules}] '{rule_name}' 다운로드 완료 ({len(chatbot_data)}개 조문)")
                 success_count += 1
             else:
-                status_placeholder.error(f"❌ [{idx}/{total_rules}] '{rule_name}' 다운로드 실패")
+                status_placeholder.error(f"[{idx}/{total_rules}] '{rule_name}' 다운로드 실패")
 
         except Exception as e:
-            status_placeholder.error(f"❌ [{idx}/{total_rules}] '{rule_name}' 다운로드 중 오류: {str(e)}")
+            status_placeholder.error(f"[{idx}/{total_rules}] '{rule_name}' 다운로드 중 오류: {str(e)}")
 
     return success_count
 
@@ -447,7 +466,7 @@ def convert_and_load_api_laws():
             total_laws = len(st.session_state.api_downloaded_laws)
             total_articles = sum(len(law_info['data']) for law_info in st.session_state.api_downloaded_laws.values())
 
-            st.success(f"🎉 법령 통합 완료: {total_laws}개 법령, {total_articles}개 조문")
+            st.success(f"법령 통합 완료: {total_laws}개 법령, {total_articles}개 조문")
 
             # 패키지 로드 상태 업데이트
             st.session_state.packages_loaded = True
@@ -457,8 +476,14 @@ def convert_and_load_api_laws():
             return True
 
         except Exception as e:
-            st.error(f"❌ 법령 통합 중 오류 발생: {str(e)}")
+            st.error(f"법령 통합 중 오류 발생: {str(e)}")
             return False
+
+def start_new_chat():
+    """새 대화를 시작하는 함수"""
+    st.session_state.chat_history = []
+    st.success("새 대화가 시작되었습니다!")
+    st.rerun()
 
 # --- UI: 메인 ---
 st.title("📚 법령 통합 챗봇")
@@ -774,10 +799,6 @@ if st.session_state.uploaded_laws or st.session_state.api_downloaded_laws:
         st.markdown("---")
         st.header("🔄 데이터 초기화")
 
-        # 초기화 확인을 위한 세션 상태
-        if 'confirm_reset' not in st.session_state:
-            st.session_state.confirm_reset = False
-
         if st.button("🗑️ 모든 데이터 초기화", use_container_width=True, type="secondary"):
             st.session_state.confirm_reset = True
 
@@ -832,6 +853,8 @@ if st.session_state.packages_loaded:
                 'title': title_weight
             }
             st.success(f"검색 모드가 변경되었습니다: {search_mode}")
+
+    st.markdown("---")
 
     # 탭으로 챗봇과 검색 기능 분리
     tab1, tab2 = st.tabs(["💬 AI 챗봇", "🔍 법령 검색"])
