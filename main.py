@@ -759,6 +759,10 @@ if st.session_state.uploaded_laws or st.session_state.api_downloaded_laws:
                     st.rerun()
 
         st.markdown("---")
+
+# 대화 관리 섹션 (패키지 로드된 경우 항상 표시)
+if st.session_state.packages_loaded:
+    with st.sidebar:
         st.header("💬 대화 관리")
         if st.button("🔄 새 대화 시작", use_container_width=True):
             start_new_chat()

@@ -1,5 +1,6 @@
 import streamlit as st
 import re
+from law_number_utils import normalize_article_number
 
 
 def parse_article_query(search_term):
@@ -15,7 +16,8 @@ def parse_article_query(search_term):
     """
     # 띄어쓰기 무시하고 "법령명 + 제?숫자조" 패턴 매칭
     # 패턴: (법|령|규칙|규정|고시|훈령|예규 등으로 끝나는 문자열) + (제?숫자-?숫자?조의?숫자?)
-    pattern = r'(.+?(?:법|령|규칙|규정|고시|훈령|예규|특례법))\s*(제?\s*[\d\-]+\s*조(?:의\s*\d+)?)'
+    # 띄어쓰기 유연하게 허용: "관세법 42조의2", "관세법 제42조의2", "관세법 42 조 의 2" 모두 매칭
+    pattern = r'(.+?(?:법|법률|령|규칙|규정|고시|훈령|예규|특례법))\s*(제?\s*[\d\-]+\s*조\s*(?:의\s*\d+)?)'
 
     match = re.search(pattern, search_term, re.IGNORECASE)
     if match:
@@ -69,8 +71,16 @@ def search_laws(search_term, selected_laws, collected_laws):
                     if '조번호' in article:
                         article_num = str(article['조번호']).strip()
 
-                        # 조번호 정확 매칭
-                        if article_num == target_article_num:
+                        # 비교를 위해 양쪽 조문번호 정규화
+                        normalized_article = normalize_article_number(article_num)
+                        normalized_target = normalize_article_number(target_article_num)
+
+                        # 정규화 실패 시 스킵
+                        if normalized_article is None or normalized_target is None:
+                            continue
+
+                        # 정규화된 번호 비교
+                        if normalized_article == normalized_target:
                             # 전체 내용 하이라이트 (조번호 강조)
                             searchable_content = ""
                             if '조번호' in article:
