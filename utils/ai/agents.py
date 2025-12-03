@@ -62,10 +62,22 @@ def get_agent_response(law_name: str, question: str, history: str,
         """
 
         client = get_model()
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt
-        )
+
+        try:
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt
+            )
+        except Exception as e:
+            error_str = str(e)
+            if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
+                print(f"⚠ [{law_name}] API 한도 도달. Flash-Lite로 재시도 중...")
+                response = client.models.generate_content(
+                    model="gemini-2.5-flash-lite",
+                    contents=prompt
+                )
+            else:
+                raise e
 
         return law_name, response.text
 
@@ -135,10 +147,22 @@ def get_head_agent_response(responses: List[Tuple[str, str]],
 
     try:
         client = get_model_head()
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt
-        )
+
+        try:
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt
+            )
+        except Exception as e:
+            error_str = str(e)
+            if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
+                print("⚠ 최종 통합 답변: API 한도 도달. Flash-Lite로 재시도 중...")
+                response = client.models.generate_content(
+                    model="gemini-2.5-flash-lite",
+                    contents=prompt
+                )
+            else:
+                raise e
 
         return response.text
 

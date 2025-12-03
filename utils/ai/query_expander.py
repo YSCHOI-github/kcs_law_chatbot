@@ -165,6 +165,23 @@ class QueryExpander:
                 model="gemini-2.5-flash",
                 contents=prompt
             )
+        except Exception as e:
+            error_str = str(e)
+            if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
+                print("⚠ 유사 질문 생성: API 한도 도달. Flash-Lite로 재시도 중...")
+                try:
+                    response = self.client.models.generate_content(
+                        model="gemini-2.5-flash-lite",
+                        contents=prompt
+                    )
+                except Exception as e2:
+                    print(f"유사 질문 생성 오류 (Flash-Lite): {e2}")
+                    return [original_query]
+            else:
+                print(f"유사 질문 생성 오류: {e}")
+                return [original_query]
+
+        try:
             # 응답에서 질문들 추출
             questions = []
             lines = response.text.strip().split('\n')
@@ -178,7 +195,7 @@ class QueryExpander:
             return questions[:3]
 
         except Exception as e:
-            print(f"유사 질문 생성 오류: {e}")
+            print(f"유사 질문 파싱 오류: {e}")
             # 폴백: 원본 질문만 반환
             return [original_query]
 
