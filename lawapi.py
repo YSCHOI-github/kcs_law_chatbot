@@ -10,19 +10,71 @@ import streamlit as st
 class LawAPI:
     def __init__(self, oc: str):
         """법령 API 클래스 초기화
-        
+
         Args:
             oc: API 키
         """
         self.oc = oc
         self.base_url = "http://www.law.go.kr/DRF/"
-    
+
+    def _find_best_match(self, query: str, items: List, name_tag: str, id_tag: str) -> Optional[Dict]:
+        """
+        검색 결과 중 가장 정확히 매칭되는 항목을 찾음
+
+        매칭 우선순위:
+        1. 정확히 일치 (공백 완전히 무시)
+        2. query가 name에 포함 (공백 무시)
+        3. 첫 번째 결과 (fallback)
+
+        공백은 비교시 완전히 무시됨!
+        """
+        # Normalize query (remove ALL spaces for comparison)
+        query_normalized = query.replace(" ", "")
+
+        exact_match = None
+        contains_match = None
+        first_result = None
+
+        for item in items:
+            item_name = item.findtext(name_tag)
+            item_id = item.findtext(id_tag)
+
+            if not item_name or not item_id:
+                continue
+
+            # Store first valid result as fallback
+            if first_result is None:
+                first_result = {"id": item_id, "name": item_name}
+
+            # Check exact match (ignore spaces completely)
+            if item_name.replace(" ", "") == query_normalized:
+                exact_match = {"id": item_id, "name": item_name}
+                break  # Best match found, stop searching
+
+            # Check if query is contained in name (spaces ignored)
+            if query_normalized in item_name.replace(" ", ""):
+                if contains_match is None:
+                    contains_match = {"id": item_id, "name": item_name}
+
+        # Return best match found
+        if exact_match:
+            print(f"Found exact match (spaces ignored): {exact_match['name']}")
+            return exact_match
+        elif contains_match:
+            print(f"Using partial match: {contains_match['name']}")
+            return contains_match
+        elif first_result:
+            print(f"Using first result: {first_result['name']}")
+            return first_result
+
+        return None
+
     def search_law_id(self, query: str) -> Tuple[Optional[str], Optional[str]]:
-        """법령명으로 검색해서 첫 번째 법령의 ID를 반환
-        
+        """법령명으로 검색해서 가장 정확히 매칭되는 법령의 ID를 반환
+
         Args:
             query: 검색할 법령명
-            
+
         Returns:
             Tuple[법령ID, 법령명한글] 또는 (None, None)
         """
@@ -31,7 +83,8 @@ class LawAPI:
             "OC": self.oc,
             "target": "law",
             "type": "XML",
-            "query": query
+            "query": query,
+            "display": 20
         }
 
         response = None
@@ -40,12 +93,18 @@ class LawAPI:
             response.raise_for_status()
 
             root = ET.fromstring(response.content)
-            law = root.find("law")
+            laws = root.findall("law")
 
-            if law is None:
+            if not laws:
                 return None, None
 
-            return law.findtext("법령ID"), law.findtext("법령명한글")
+            # Find best match
+            best_match = self._find_best_match(query, laws, "법령명한글", "법령ID")
+
+            if best_match:
+                return best_match["id"], best_match["name"]
+
+            return None, None
 
         except Exception as e:
             # 에러 발생 시 서버에서 받은 실제 응답을 출력 (가능한 경우에만)
@@ -112,16 +171,21 @@ class LawAPI:
                     articles_list = articles["조문단위"]
 
                 for article in articles_list:
-                    full_content = article.get("조문내용", "")
-                    
+                    content = article.get("조문내용", "")
+                    # 조문내용이 리스트인 경우 처리
+                    if isinstance(content, list):
+                        full_content = "\n".join(str(item) for item in content if item)
+                    else:
+                        full_content = content if content else ""
+
                     # 항 데이터가 있는 경우 조문내용에 추가
                     if "항" in article:
                         full_content += self._extract_all_content_from_items(article["항"])
-                    
+
                     article_data = {
                         "조문번호": article.get("조문번호"),
                         "조문제목": article.get("조문제목"),
-                        "조문내용": full_content.strip()  # 공백 제거
+                        "조문내용": full_content.strip() if isinstance(full_content, str) else full_content
                     }
                     cleaned_data["조문"].append(article_data)
         
