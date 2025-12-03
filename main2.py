@@ -81,12 +81,53 @@ def get_available_packages():
     json_files = list(laws_dir.glob("*.json"))
     package_names = {
         "customs_investigation": "관세조사",
-        "foreign_exchange_investigation": "외환조사", 
+        "foreign_exchange_investigation": "외환조사",
         "foreign_trade": "대외무역",
         "free_trade_agreement": "자유무역협정",
-        "refund": "환급"
+        "refund": "환급",
+        "professional_position_management": "전문직위/보직관리",
+        "special_promotion": "특별승급",
+        "training": "교육훈련",
+        "performance_evaluation": "성과평가",
+        "disciplinary_action": "징계",
+        "service_discipline": "복무규율",
+        "government_contract": "정부계약",
+        "accounting_officer": "회계직",
+        "serious_accident": "중대재해"
     }
-    
+
+    # Package division structure
+    PACKAGE_DIVISIONS = [
+        {
+            "emoji": "📋",
+            "name": "심사2국",
+            "full_name": "심사2국 (Customs Investigation Division 2)",
+            "packages": [
+                "customs_investigation",
+                "foreign_exchange_investigation",
+                "foreign_trade",
+                "free_trade_agreement",
+                "refund"
+            ]
+        },
+        {
+            "emoji": "👥",
+            "name": "운영지원과",
+            "full_name": "운영지원과 (Operations Support Division)",
+            "packages": [
+                "professional_position_management",
+                "special_promotion",
+                "training",
+                "performance_evaluation",
+                "disciplinary_action",
+                "service_discipline",
+                "government_contract",
+                "accounting_officer",
+                "serious_accident"
+            ]
+        }
+    ]
+
     available_packages = {}
     for json_file in json_files:
         package_id = json_file.stem
@@ -123,6 +164,11 @@ def load_selected_packages(selected_package_ids, auto_process=False):
         "foreign_trade": "대외무역",
         "free_trade_agreement": "자유무역협정",
         "refund": "환급",
+        "professional_position_management": "전문직위/보직관리",
+        "special_promotion": "특별승급",
+        "training": "교육훈련",
+        "performance_evaluation": "성과평가",
+        "disciplinary_action": "징계",
         "user_upload": "사용자 업로드"
     }
     
@@ -485,17 +531,67 @@ if selection_mode == "📂 사전 패키지 사용":
         st.info("💡 download_packages.py를 먼저 실행하여 법령 패키지를 다운로드하세요.")
         st.code("python download_packages.py", language="bash")
     else:
-        # 패키지 선택 버튼
-        cols = st.columns(len(available_packages))
-
+        # 패키지 선택 버튼 - 수직 섹션 레이아웃
         current_selection = []
-        for i, (package_id, package_info) in enumerate(available_packages.items()):
-            with cols[i]:
-                is_selected = package_id in st.session_state.current_selected_packages
-                button_type = "primary" if is_selected else "secondary"
 
-                if st.button(f"📂 {package_info['name']}", type=button_type, key=f"pkg_{package_id}"):
-                    current_selection = [package_id]
+        # PACKAGE_DIVISIONS는 get_available_packages() 함수 내에서 정의되어 있음
+        # 여기서는 직접 정의
+        PACKAGE_DIVISIONS = [
+            {
+                "emoji": "📋",
+                "name": "심사2국",
+                "full_name": "심사2국 (Customs Investigation Division 2)",
+                "packages": [
+                    "customs_investigation",
+                    "foreign_exchange_investigation",
+                    "foreign_trade",
+                    "free_trade_agreement",
+                    "refund"
+                ]
+            },
+            {
+                "emoji": "👥",
+                "name": "운영지원과",
+                "full_name": "운영지원과 (Operations Support Division)",
+                "packages": [
+                    "professional_position_management",
+                    "special_promotion",
+                    "training",
+                    "performance_evaluation",
+                    "disciplinary_action",
+                    "service_discipline",
+                    "government_contract",
+                    "accounting_officer",
+                    "serious_accident"
+                ]
+            }
+        ]
+
+        for division in PACKAGE_DIVISIONS:
+            # Division header with styled markdown
+            st.markdown(
+                f"### {division['emoji']} {division['full_name']}"
+            )
+            st.markdown("---")
+
+            # Package buttons in 3-column grid
+            cols = st.columns(3)
+            for idx, package_id in enumerate(division["packages"]):
+                if package_id in available_packages:
+                    package_info = available_packages[package_id]
+                    with cols[idx % 3]:
+                        is_selected = package_id in st.session_state.current_selected_packages
+                        button_type = "primary" if is_selected else "secondary"
+                        if st.button(
+                            f"📂 {package_info['name']}",
+                            type=button_type,
+                            key=f"pkg_{package_id}",
+                            use_container_width=True
+                        ):
+                            current_selection = [package_id]
+
+            # Spacing between divisions
+            st.markdown("")
 
         # 버튼 클릭으로 선택이 변경된 경우 처리
         if current_selection and set(current_selection) != set(st.session_state.current_selected_packages):
@@ -642,6 +738,26 @@ with st.sidebar:
         **💰 환급 패키지**
         - 수출용 원재료에 대한 관세 등 환급에 관한 특례법, 시행령, 시행규칙
         - 환급사무처리 고시, 위탁가공 환급처리 예규, 환급사무 훈령 등
+
+        **👔 전문직위/보직관리 패키지**
+        - 국가공무원법, 공무원임용령, 공무원임용규칙
+        - 세관공무원 인사관리에 관한 훈령, 관세청 직위유형별 보직관리 지침, 관세청 전자보직제도 운영에 관한 예규
+
+        **💰 특별승급 패키지**
+        - 공무원 보수규정
+        - 공무원보수 등의 업무지침, 세관공무원 인사관리에 관한 훈령
+
+        **📚 교육훈련 패키지**
+        - 공무원 인재개발법, 공무원 인재개발법 시행령
+        - 공무원 인재개발 업무처리지침, 관세청 인재개발에 관한 훈령
+
+        **📊 성과평가 패키지**
+        - 국가공무원법, 공무원 성과평가 등에 관한 규정
+        - 공무원 성과평가 등에 관한 지침, 세관공무원 인사관리에 관한 훈령, 근무실적평가제도 운영지침
+
+        **⚖️ 징계 패키지**
+        - 국가공무원법, 공무원 징계령, 공무원 징계령 시행규칙
+        - 관세공무원 상벌에 관한 훈령
         """)
 
     st.markdown("---")
