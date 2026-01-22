@@ -224,6 +224,12 @@
 ```
 kcs_law_chatbot/
 ├── main.py                         # 메인 프로그램 (실행 파일)
+├── lawapi.py                       # 법령 API 다운로드 및 3단비교 로직
+├── adminapi.py                     # 행정규칙 API 및 조문 파싱 로직
+├── law_number_utils.py            # 조문 번호 정규화 유틸리티
+├── pdf_txt_json.py                # PDF/TXT 파일 파싱 및 JSON 변환
+├── download_packages.py           # 법령 다운로드 스크립트
+├── law_article_search.py          # 법령 검색 UI
 ├── utils/                          # 핵심 기능 모듈
 │   ├── ai/                         # AI 관련 기능
 │   │   ├── agents.py              # 멀티 에이전트 시스템
@@ -232,11 +238,10 @@ kcs_law_chatbot/
 │   ├── tfidf/                     # 검색 엔진
 │   │   ├── search.py             # TF-IDF 검색 로직
 │   │   ├── vectorizer.py         # 법령 텍스트 벡터화
-│   │   └── cache.py              # 검색 속도 향상용 캐시
+│   │   ├── cache.py              # 검색 속도 향상용 캐시
+│   │   └── config.py             # 검색 설정
 │   ├── preprocessing.py           # 법령 텍스트 전처리
 │   └── file_upload.py            # 사용자 파일 업로드 처리
-├── law_article_search.py          # 법령 검색 UI
-├── download_packages.py           # 법령 다운로드 스크립트
 ├── laws/                          # 법령 데이터 (JSON 파일)
 │   ├── customs_investigation.json
 │   ├── foreign_exchange_investigation.json
@@ -388,6 +393,8 @@ google-genai           # Gemini AI 모델 연동
 scikit-learn          # TF-IDF 벡터화
 requests              # 법령 API 호출
 python-dotenv         # 환경변수 관리
+pdfminer.six          # PDF 파일 텍스트 추출
+numpy                 # 수치 연산 (TF-IDF 의존성)
 ```
 
 ---
