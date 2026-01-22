@@ -2,7 +2,7 @@
 
 from .query_expander import QueryExpander, QueryPreprocessor
 from .agents import get_agent_response, get_head_agent_response, get_head_agent_response_stream
-from .models import get_model, get_model_head
+from .models import get_client, GeminiClientWrapper, MODEL_FLASH, MODEL_FLASH_LITE
 
 __all__ = [
     'QueryExpander',
@@ -10,6 +10,8 @@ __all__ = [
     'get_agent_response',
     'get_head_agent_response',
     'get_head_agent_response_stream',
-    'get_model',
-    'get_model_head',
+    'get_client',
+    'GeminiClientWrapper',
+    'MODEL_FLASH',
+    'MODEL_FLASH_LITE',
 ]

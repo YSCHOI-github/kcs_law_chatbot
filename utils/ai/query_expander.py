@@ -2,8 +2,8 @@
 
 사용자 쿼리를 분석하여 유사 질문 생성 및 키워드 확장을 수행합니다.
 """
-from google import genai
-import os
+from utils.ai.models import get_client, MODEL_FLASH, MODEL_FLASH_2_0
+
 import re
 from typing import List
 
@@ -17,8 +17,7 @@ class QueryExpander:
         Args:
             title_terms: 법령 제목 용어 리스트
         """
-        api_key = os.getenv('GOOGLE_API_KEY')
-        self.client = genai.Client(api_key=api_key)
+        self.client = get_client()
         self.title_terms = title_terms or []
 
     def extract_keywords_and_synonyms(self, query: str, search_weights: dict = None) -> str:
@@ -76,12 +75,12 @@ class QueryExpander:
 """
 
         try:
-            response = self.client.models.generate_content(
-                model="gemini-2.0-flash",
+            response = self.client.generate_content(
+                model=MODEL_FLASH_2_0,
                 contents=prompt
             )
             # 응답에서 키워드들만 추출
-            keywords_text = response.text.strip()
+            keywords_text = response.strip()
             # 불필요한 문자 제거하고 단어들만 추출
             keywords = re.findall(r'[가-힣]{2,}', keywords_text)
 
@@ -161,30 +160,18 @@ class QueryExpander:
 """
 
         try:
-            response = self.client.models.generate_content(
-                model="gemini-2.5-flash",
+            response = self.client.generate_content(
+                model=MODEL_FLASH,
                 contents=prompt
             )
         except Exception as e:
-            error_str = str(e)
-            if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
-                print("⚠ 유사 질문 생성: API 한도 도달. Flash-Lite로 재시도 중...")
-                try:
-                    response = self.client.models.generate_content(
-                        model="gemini-2.5-flash-lite",
-                        contents=prompt
-                    )
-                except Exception as e2:
-                    print(f"유사 질문 생성 오류 (Flash-Lite): {e2}")
-                    return [original_query]
-            else:
-                print(f"유사 질문 생성 오류: {e}")
-                return [original_query]
+            print(f"유사 질문 생성 오류: {e}")
+            return [original_query]
 
         try:
             # 응답에서 질문들 추출
             questions = []
-            lines = response.text.strip().split('\n')
+            lines = response.strip().split('\n')
             for line in lines:
                 # 숫자와 점으로 시작하는 줄에서 질문 추출
                 match = re.search(r'^\d+\.\s*(.+)', line.strip())

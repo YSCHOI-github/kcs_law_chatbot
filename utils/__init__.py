@@ -24,8 +24,8 @@ from .ai import (
     get_agent_response,
     get_head_agent_response,
     get_head_agent_response_stream,
-    get_model,
-    get_model_head
+    get_client,
+    GeminiClientWrapper
 )
 
 # 전처리 모듈
@@ -121,8 +121,8 @@ __all__ = [
     'get_agent_response',
     'get_head_agent_response',
     'get_head_agent_response_stream',
-    'get_model',
-    'get_model_head',
+    'get_client',
+    'GeminiClientWrapper',
 
     # 전처리
     'extract_title_terms_from_laws',

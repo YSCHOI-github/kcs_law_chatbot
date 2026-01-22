@@ -4,7 +4,7 @@
 """
 from typing import Dict, List, Tuple
 from ..tfidf.search import search_relevant_chunks
-from .models import get_model, get_model_head
+from .models import get_client
 
 
 def get_agent_response(law_name: str, question: str, history: str,
@@ -61,25 +61,15 @@ def get_agent_response(law_name: str, question: str, history: str,
         5. 법령 조항 번호와 제목을 정확히 인용하여 신뢰성을 높여주세요.
         """
 
-        client = get_model()
+        client = get_client()
 
         try:
-            response = client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=prompt
-            )
+            response_text = client.generate_content(prompt)
         except Exception as e:
-            error_str = str(e)
-            if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
-                print(f"⚠ [{law_name}] API 한도 도달. Flash-Lite로 재시도 중...")
-                response = client.models.generate_content(
-                    model="gemini-2.5-flash-lite",
-                    contents=prompt
-                )
-            else:
-                raise e
+            # generate_content 내부에서 사용자 친화적 메시지가 담긴 예외를 던지므로 그대로 사용
+            return law_name, str(e)
 
-        return law_name, response.text
+        return law_name, response_text
 
     except Exception as e:
         return law_name, f"답변 생성 중 오류: {str(e)}"
@@ -146,25 +136,8 @@ def get_head_agent_response(responses: List[Tuple[str, str]],
 """
 
     try:
-        client = get_model_head()
-
-        try:
-            response = client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=prompt
-            )
-        except Exception as e:
-            error_str = str(e)
-            if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
-                print("⚠ 최종 통합 답변: API 한도 도달. Flash-Lite로 재시도 중...")
-                response = client.models.generate_content(
-                    model="gemini-2.5-flash-lite",
-                    contents=prompt
-                )
-            else:
-                raise e
-
-        return response.text
+        client = get_client()
+        return client.generate_content(prompt)
 
     except Exception as e:
         return f"최종 답변 생성 중 오류가 발생했습니다: {str(e)}"
@@ -232,15 +205,8 @@ def get_head_agent_response_stream(responses: List[Tuple[str, str]],
 """
 
     try:
-        client = get_model_head()
-        response_stream = client.models.generate_content_stream(
-            model="gemini-2.5-flash",
-            contents=prompt
-        )
-
-        for chunk in response_stream:
-            if chunk.text:
-                yield chunk.text
+        client = get_client()
+        yield from client.generate_content_stream(prompt)
 
     except Exception as e:
         yield f"최종 답변 생성 중 오류가 발생했습니다: {str(e)}"
